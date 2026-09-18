@@ -1,0 +1,6 @@
+sylvatwin-graph.ttl
+sylvatwin-inferred.ttl
+sylvatwin-full*.ttl
+snapshots/
+*.bak
+.venv/
