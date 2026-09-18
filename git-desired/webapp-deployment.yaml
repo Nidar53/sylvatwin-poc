@@ -1,0 +1,27 @@
+# ============================================================
+# COTE DESIRED — ce fichier joue le role du depot Git.
+# Le fact-writer le lit pour ecrire les proprietes desired_*.
+# C'est AUSSI le fichier a appliquer au cluster :
+#   kubectl apply -f git-desired/webapp-deployment.yaml
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: webapp
+  template:
+    metadata:
+      labels:
+        app: webapp        # <- utilise par le fact-writer pour partOf
+    spec:
+      nodeSelector:
+        disktype: ssd      # <- l'exigence du scenario 1
+      containers:
+        - name: webapp
+          image: nginx:alpine
+          resources:
+            requests: { cpu: "10m", memory: "16Mi" }

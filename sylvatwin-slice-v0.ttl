@@ -1,0 +1,53 @@
+@prefix : <https://w3id.org/sylvatwin/k8s#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+<https://w3id.org/sylvatwin/k8s> a owl:Ontology ;
+    dcterms:title "SylvaTwin - Kubernetes vertical slice (scenarios 0+1)"@en ;
+    dcterms:creator "Ahmed Nidhar Sebihi" ;
+    owl:versionInfo "0.1.0" .
+
+:KubernetesResource a owl:Class ;
+    rdfs:label "Kubernetes resource"@en ;
+    rdfs:comment "Entite logique du cluster, decrite par Git (desired_*) et la Watch API (actual_*)."@fr .
+
+:Deployment a owl:Class ; rdfs:subClassOf :KubernetesResource ;
+    rdfs:label "Deployment"@en ;
+    rdfs:comment "Workload declare dans Git ; porte l'intention (replicas, nodeSelector)."@fr .
+
+:Pod a owl:Class ; rdfs:subClassOf :KubernetesResource ;
+    rdfs:label "Pod"@en ;
+    rdfs:comment "Unite d'execution observee ; cote actual uniquement."@fr .
+
+:Node a owl:Class ; rdfs:subClassOf :KubernetesResource ;
+    rdfs:label "Node"@en ;
+    rdfs:comment "Machine du cluster ; PAS decrite dans Git, seulement observee."@fr .
+
+:Drift a owl:Class ;
+    rdfs:label "Drift"@en ;
+    rdfs:comment "Divergence detectee entre etat declare et etat observe."@fr .
+
+:ConfigurationDrift a owl:Class ; rdfs:subClassOf :Drift ;
+    rdfs:comment "Scenario 0 : desaccord desired/actual sur une propriete d'un objet."@fr .
+
+:PlacementDrift a owl:Class ; rdfs:subClassOf :Drift ;
+    rdfs:comment "Scenario 1 : pod sur un noeud ne satisfaisant plus son exigence ; cross-layer."@fr .
+
+:partOf a owl:ObjectProperty ; rdfs:domain :Pod ; rdfs:range :Deployment ;
+    rdfs:comment "Pod appartient a un Deployment (ReplicaSet court-circuite en v0)."@fr .
+
+:runsOn a owl:ObjectProperty ; rdfs:domain :Pod ; rdfs:range :Node ;
+    rdfs:comment "Depuis pod.spec.nodeName ; LA relation cross-layer."@fr .
+
+:affects a owl:ObjectProperty ; rdfs:domain :Drift ; rdfs:range :KubernetesResource ;
+    rdfs:comment "Derive -> ressources impactees ; ecrit par la detection."@fr .
+
+:desiredReplicas a owl:DatatypeProperty ; rdfs:domain :Deployment ; rdfs:range xsd:integer .
+:requiresNodeLabel a owl:DatatypeProperty ; rdfs:domain :Deployment ; rdfs:range xsd:string .
+:actualReplicas a owl:DatatypeProperty ; rdfs:domain :Deployment ; rdfs:range xsd:integer .
+:offersLabel a owl:DatatypeProperty ; rdfs:domain :Node ; rdfs:range xsd:string .
+:observedAt a owl:DatatypeProperty ; rdfs:domain :KubernetesResource ; rdfs:range xsd:dateTime .
+:detectedAt a owl:DatatypeProperty ; rdfs:domain :Drift ; rdfs:range xsd:dateTime .

@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+"""
+SylvaTwin PoC — DETECTEUR DE DERIVES
+=====================================
+Lit le graphe maintenu par fact_writer.py et execute les requetes SPARQL
+des scenarios 0 et 1. C'est ICI (et seulement ici) que vit la logique de
+detection — sous forme declarative.
+
+Usage :
+  python3 detect.py                 # affiche les derives
+  python3 detect.py --materialize   # + cree les individus Drift dans le graphe
+"""
+import os
+import sys
+import uuid
+from datetime import datetime, timezone
+
+from rdflib import Graph, Namespace, Literal, RDF
+from rdflib.namespace import XSD
+
+NS = Namespace("https://w3id.org/sylvatwin/k8s#")
+HERE = os.path.dirname(os.path.abspath(__file__))
+GRAPH_FILE = os.path.join(HERE, "sylvatwin-graph.ttl")
+INFERRED_FILE = os.path.join(HERE, "sylvatwin-inferred.ttl")
+PREFIX = "PREFIX : <https://w3id.org/sylvatwin/k8s#>\n"
+
+Q0 = PREFIX + """
+SELECT ?deployment ?desired ?actual WHERE {
+  ?deployment a :Deployment ;
+              :desiredReplicas ?desired ;
+              :actualReplicas ?actual .
+  FILTER (?desired != ?actual)
+}"""
+
+Q1 = PREFIX + """
+SELECT ?pod ?deployment ?node ?requiredLabel WHERE {
+  ?pod a :Pod ; :partOf ?deployment ; :runsOn ?node .
+  ?deployment :requiresNodeLabel ?requiredLabel .
+  FILTER NOT EXISTS { ?node :offersLabel ?requiredLabel }
+}"""
+
+Q1BIS = PREFIX + """
+SELECT DISTINCT ?deployment WHERE {
+  ?pod a :Pod ; :partOf ?deployment ; :runsOn ?node .
+  ?deployment :requiresNodeLabel ?requiredLabel .
+  FILTER NOT EXISTS { ?node :offersLabel ?requiredLabel }
+}"""
+
+
+def short(term) -> str:
+    return str(term).split("#")[-1]
+
+
+def main() -> None:
+    if not os.path.exists(GRAPH_FILE):
+        sys.exit(f"Graphe introuvable : {GRAPH_FILE} — lance d'abord fact_writer.py")
+    g = Graph()
+    g.parse(GRAPH_FILE, format="turtle")
+    print(f"Graphe charge : {len(g)} triplets\n")
+
+    print("=== SCENARIO 0 — derive de replicas (Q0) ===")
+    rows0 = list(g.query(Q0))
+    if not rows0:
+        print("  aucune derive de configuration.")
+    for r in rows0:
+        print(f"  DERIVE : {short(r.deployment)}  desired={r.desired}  actual={r.actual}")
+
+    print("\n=== SCENARIO 1 — derive de placement (Q1) ===")
+    rows1 = list(g.query(Q1))
+    if not rows1:
+        print("  aucune derive de placement.")
+    for r in rows1:
+        print(f"  DERIVE : {short(r.pod)}  sur {short(r.node)}  "
+              f"exige '{r.requiredLabel}'  (via {short(r.deployment)})")
+
+    if rows1:
+        print("\n=== IMPACT (Q1bis) — Deployments derives ===")
+        for r in g.query(Q1BIS):
+            print(f"  IMPACTE : {short(r.deployment)}")
+
+    # ---- materialisation (reification des derives dans le graphe)
+    if "--materialize" in sys.argv and (rows0 or rows1):
+        inferred = Graph()
+        for prefix, ns in g.namespaces():
+            inferred.bind(prefix, ns)
+        now = Literal(datetime.now(timezone.utc).isoformat(), datatype=XSD.dateTime)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        for r in rows0:
+            d = NS[f"drift_{stamp}_{short(r.deployment)}_{uuid.uuid4().hex[:4]}"]
+            inferred.add((d, RDF.type, NS.ConfigurationDrift))
+            inferred.add((d, NS.affects, r.deployment))
+            inferred.add((d, NS.detectedAt, now))
+        for r in rows1:
+            d = NS[f"drift_{stamp}_{short(r.pod)}_{uuid.uuid4().hex[:4]}"]
+            inferred.add((d, RDF.type, NS.PlacementDrift))
+            inferred.add((d, NS.affects, r.pod))
+            inferred.add((d, NS.affects, r.deployment))
+            inferred.add((d, NS.detectedAt, now))
+        inferred.serialize(destination=INFERRED_FILE, format="turtle")
+        print(f"\n{len(rows0) + len(rows1)} individu(s) Drift materialise(s) dans le graphe.")
+
+
+if __name__ == "__main__":
+    main()

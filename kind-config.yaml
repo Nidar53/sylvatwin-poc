@@ -1,0 +1,9 @@
+# Cluster kind pour le PoC SylvaTwin : 1 control-plane + 2 workers
+# Creation :  kind create cluster --name sylvatwin --config kind-config.yaml
+# Les noeuds s'appelleront : sylvatwin-control-plane, sylvatwin-worker, sylvatwin-worker2
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+  - role: worker
+  - role: worker
