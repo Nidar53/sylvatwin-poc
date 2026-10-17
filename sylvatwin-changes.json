@@ -1,0 +1,11 @@
+{
+  "duration_s": 224.44156002998352,
+  "samples": 45,
+  "changes": {
+    "actualReplicas": 4,
+    "partOf": 4,
+    "type": 4,
+    "runsOn": 4,
+    "offersLabel": 2
+  }
+}

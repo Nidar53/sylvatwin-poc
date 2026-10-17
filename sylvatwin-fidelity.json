@@ -1,0 +1,89 @@
+{
+  "graph_triples": 150,
+  "m1_population": {
+    "score": 1.0,
+    "rows": [
+      {
+        "famille": "Node",
+        "cluster": 3,
+        "graphe": 3,
+        "presents": 3,
+        "manquants": [],
+        "fantomes": [],
+        "score": 1.0
+      },
+      {
+        "famille": "Deployment",
+        "cluster": 3,
+        "graphe": 3,
+        "presents": 3,
+        "manquants": [],
+        "fantomes": [],
+        "score": 1.0
+      },
+      {
+        "famille": "Pod",
+        "cluster": 16,
+        "graphe": 16,
+        "presents": 16,
+        "manquants": [],
+        "fantomes": [],
+        "score": 1.0
+      }
+    ],
+    "missing": [],
+    "ghosts": []
+  },
+  "m2_accuracy": {
+    "score": 1.0,
+    "attendus": 46,
+    "corrects": 46,
+    "divergences": []
+  },
+  "m3_consistency": {
+    "score": 0.8333333333333334,
+    "checks": [
+      {
+        "regle": "un Pod sur un seul Node",
+        "axiome": ":runsOn a owl:FunctionalProperty",
+        "violations": [],
+        "ok": true
+      },
+      {
+        "regle": "un Pod dans un seul Deployment",
+        "axiome": ":partOf a owl:FunctionalProperty",
+        "violations": [],
+        "ok": true
+      },
+      {
+        "regle": "classes disjointes",
+        "axiome": ":Pod owl:disjointWith :Node",
+        "violations": [],
+        "ok": true
+      },
+      {
+        "regle": "runsOn vise un Node",
+        "axiome": ":runsOn rdfs:range :Node",
+        "violations": [],
+        "ok": true
+      },
+      {
+        "regle": "partOf vise un Deployment",
+        "axiome": ":partOf rdfs:range :Deployment",
+        "violations": [
+          "partOf pointe vers kindnet, qui n'est pas un Deployment"
+        ],
+        "ok": false
+      },
+      {
+        "regle": "tout individu est type",
+        "axiome": "(bonne pratique)",
+        "violations": [],
+        "ok": true
+      }
+    ],
+    "passed": 5,
+    "total": 6
+  },
+  "m4_latency": null
+}

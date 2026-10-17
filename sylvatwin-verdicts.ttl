@@ -1,0 +1,56 @@
+@prefix : <https://w3id.org/sylvatwin/k8s#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+:twinstate_20261008T154751 a :TwinState ;
+    :conformCount 5 ;
+    :decidable true ;
+    :graphAge 3.19 ;
+    :issuedAt "2026-10-08T15:47:51.191819+00:00"^^xsd:dateTime ;
+    :unknownCount 0 ;
+    :violatedCount 0 .
+
+:verdict_C_webapp_cardinalite_20261008T154751 a :ConformVerdict,
+        :Verdict ;
+    :aboutConstraint :C_webapp_cardinalite ;
+    :informationAge 3.19 ;
+    :issuedAt "2026-10-08T15:47:51.191819+00:00"^^xsd:dateTime ;
+    :limitedBy :partOf ;
+    :stalenessRatio 0.539 ;
+    :validityHorizon 5.91 .
+
+:verdict_C_webapp_existence_20261008T154751 a :ConformVerdict,
+        :Verdict ;
+    :aboutConstraint :C_webapp_existence ;
+    :informationAge 3.19 ;
+    :issuedAt "2026-10-08T15:47:51.191819+00:00"^^xsd:dateTime ;
+    :limitedBy :actualReplicas ;
+    :stalenessRatio 0.539 ;
+    :validityHorizon 5.91 .
+
+:verdict_C_webapp_placement_disktype_20261008T154751 a :ConformVerdict,
+        :Verdict ;
+    :aboutConstraint :C_webapp_placement_disktype ;
+    :informationAge 3.19 ;
+    :issuedAt "2026-10-08T15:47:51.191819+00:00"^^xsd:dateTime ;
+    :limitedBy :runsOn ;
+    :stalenessRatio 0.539 ;
+    :validityHorizon 5.91 .
+
+:verdict_C_webapp_placement_disktype_pod_20261008T154751 a :ConformVerdict,
+        :Verdict ;
+    :aboutConstraint :C_webapp_placement_disktype_pod ;
+    :informationAge 3.19 ;
+    :issuedAt "2026-10-08T15:47:51.191819+00:00"^^xsd:dateTime ;
+    :limitedBy :runsOn ;
+    :stalenessRatio 0.539 ;
+    :validityHorizon 5.91 .
+
+:verdict_C_webapp_replicas_20261008T154751 a :ConformVerdict,
+        :Verdict ;
+    :aboutConstraint :C_webapp_replicas ;
+    :informationAge 3.19 ;
+    :issuedAt "2026-10-08T15:47:51.191819+00:00"^^xsd:dateTime ;
+    :limitedBy :actualReplicas ;
+    :stalenessRatio 0.539 ;
+    :validityHorizon 5.91 .
+

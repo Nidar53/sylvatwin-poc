@@ -1,0 +1,62 @@
+@prefix : <https://w3id.org/sylvatwin/k8s#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+:Shape_webapp a sh:NodeShape ;
+    sh:class :Deployment ;
+    sh:message "Le Deployment webapp est declare dans Git mais absent du cluster."@fr ;
+    sh:property :C_webapp_cardinalite,
+        :C_webapp_existence,
+        :C_webapp_placement_disktype,
+        :C_webapp_replicas ;
+    sh:targetNode :webapp .
+
+:C_webapp_cardinalite a :Constraint ;
+    sh:maxCount 3 ;
+    sh:message "Derive de cardinalite : webapp doit avoir exactement 3 Pods observes."@fr ;
+    sh:minCount 3 ;
+    sh:path [ sh:inversePath :partOf ] ;
+    :derivedFromField "spec.replicas" ;
+    :detectsDrift :ConfigurationDrift ;
+    :readsProperty :partOf .
+
+:C_webapp_existence a :Constraint ;
+    sh:message "Le Deployment webapp n'a aucun etat observe."@fr ;
+    sh:minCount 1 ;
+    sh:path :actualReplicas ;
+    :derivedFromField "metadata.name" ;
+    :detectsDrift :ConfigurationDrift ;
+    :readsProperty :actualReplicas .
+
+:C_webapp_placement_disktype a :Constraint ;
+    sh:message "Derive de placement sur webapp : contrainte 'disktype=ssd' non satisfaite."@fr ;
+    sh:node :P_webapp_placement_disktype ;
+    sh:path [ sh:inversePath :partOf ] ;
+    :derivedFromField "nodeSelector.disktype" ;
+    :detectsDrift :PlacementDrift ;
+    :readsProperty :offersLabel,
+        :partOf,
+        :runsOn .
+
+:C_webapp_placement_disktype_pod a :Constraint ;
+    sh:hasValue "disktype=ssd" ;
+    sh:message "Derive de placement : ce Pod de webapp tourne sur un noeud qui n'offre pas 'disktype=ssd'."@fr ;
+    sh:path ( :runsOn :offersLabel ) ;
+    :derivedFromField "nodeSelector.disktype" ;
+    :detectsDrift :PlacementDrift ;
+    :readsProperty :offersLabel,
+        :runsOn .
+
+:C_webapp_replicas a :Constraint ;
+    sh:hasValue 3 ;
+    sh:message "Derive de configuration : webapp doit avoir 3 replicas."@fr ;
+    sh:minCount 1 ;
+    sh:path :actualReplicas ;
+    :derivedFromField "spec.replicas" ;
+    :detectsDrift :ConfigurationDrift ;
+    :readsProperty :actualReplicas .
+
+:P_webapp_placement_disktype a sh:NodeShape ;
+    sh:property :C_webapp_placement_disktype_pod .
+

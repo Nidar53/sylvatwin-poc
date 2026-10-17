@@ -1,0 +1,166 @@
+@prefix :     <https://w3id.org/sylvatwin/k8s#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+#
+# EXTENSION DE LA TBox v0 — le verdict comme individu du jumeau.
+#
+# A charger EN PLUS de sylvatwin-slice-v0.ttl, qui reste inchangee.
+# Le prefixe ':' est celui de ta TBox v0 : https://w3id.org/sylvatwin/k8s#
+#
+# Raison d'etre : un jumeau numerique doit porter l'etat de sa propre analyse.
+# Un verdict affiche dans un terminal n'existe pas dans le jumeau ; un verdict
+# materialise se requete, s'historise, et se compare.
+#
+
+<https://w3id.org/sylvatwin/k8s>
+    a owl:Ontology ;
+    dcterms:title "SylvaTwin — extension verdict date" ;
+    rdfs:comment "Les verdicts de conformite comme individus du jumeau." .
+
+# ---------------------------------------------------------------------------
+# LES CONTRAINTES
+#
+# Une contrainte compilee est elle aussi une entite du jumeau : elle a une
+# origine (un champ YAML) et une famille de derive.
+# ---------------------------------------------------------------------------
+:Constraint a owl:Class ;
+    rdfs:label "Contrainte" ;
+    rdfs:comment "Une contrainte verifiable, compilee depuis l'intention Git." .
+
+:derivedFromField a owl:DatatypeProperty ;
+    rdfs:label "champ d'origine" ;
+    rdfs:domain :Constraint ;
+    rdfs:range xsd:string ;
+    rdfs:comment """Le champ YAML dont cette contrainte est issue, par exemple
+"nodeSelector.disktype". C'est la tracabilite qui permettra de proposer une
+reparation : on sait quelle ligne du manifeste est en cause.""" .
+
+:readsProperty a owl:ObjectProperty ;
+    rdfs:label "lit la propriete" ;
+    rdfs:domain :Constraint ;
+    rdfs:comment """Les proprietes du graphe que cette contrainte consulte.
+C'est ce qui rend son verdict datable : on sait de quels faits il depend.""" .
+
+:detectsDrift a owl:ObjectProperty ;
+    rdfs:label "revele la derive" ;
+    rdfs:domain :Constraint ;
+    rdfs:comment """La famille de derive que cette contrainte revele, parmi les
+sous-classes de :Drift de la TBox v0.""" .
+
+# ---------------------------------------------------------------------------
+# LES VERDICTS
+#
+# Trois etats, et non deux : c'est le coeur de la proposition.
+# ---------------------------------------------------------------------------
+:Verdict a owl:Class ;
+    rdfs:label "Verdict" ;
+    rdfs:comment "Le resultat date de l'evaluation d'une contrainte." .
+
+:ConformVerdict a owl:Class ;
+    rdfs:subClassOf :Verdict ;
+    rdfs:label "Verdict conforme" ;
+    rdfs:comment "Contrainte satisfaite, sur information fraiche." .
+
+:ViolatedVerdict a owl:Class ;
+    rdfs:subClassOf :Verdict ;
+    rdfs:label "Verdict de violation" ;
+    rdfs:comment "Derive constatee, sur information fraiche." .
+
+:UnknownVerdict a owl:Class ;
+    rdfs:subClassOf :Verdict ;
+    rdfs:label "Verdict inconnu" ;
+    rdfs:comment """Information perimee : aucune conclusion. C'est le troisieme
+etat qui manque a GitOps, a SHACL et aux moteurs de politiques.""" .
+
+# --- de quoi parle le verdict ---------------------------------------------
+:aboutConstraint a owl:ObjectProperty ;
+    rdfs:label "porte sur la contrainte" ;
+    rdfs:domain :Verdict ;
+    rdfs:range :Constraint .
+
+:aboutResource a owl:ObjectProperty ;
+    rdfs:label "porte sur la ressource" ;
+    rdfs:domain :Verdict ;
+    rdfs:range :KubernetesResource ;
+    rdfs:comment "La ressource jugee." .
+
+:evidence a owl:ObjectProperty ;
+    rdfs:label "preuve" ;
+    rdfs:domain :Verdict ;
+    rdfs:comment """Les individus qui ont motive une violation, par exemple les
+Pods mal places.""" .
+
+# --- la qualification temporelle, la vraie nouveaute ----------------------
+:informationAge a owl:DatatypeProperty ;
+    rdfs:label "age de l'information" ;
+    rdfs:domain :Verdict ;
+    rdfs:range xsd:decimal ;
+    rdfs:comment """Age, en secondes, du fait le plus ancien qui soutient ce
+verdict. Le maillon le plus faible decide.""" .
+
+:validityHorizon a owl:DatatypeProperty ;
+    rdfs:label "horizon de validite" ;
+    rdfs:domain :Verdict ;
+    rdfs:range xsd:decimal ;
+    rdfs:comment """Horizon tau de la propriete limitante, en secondes, mesure
+sur le cluster par la commande observe.""" .
+
+:limitedBy a owl:ObjectProperty ;
+    rdfs:label "limite par" ;
+    rdfs:domain :Verdict ;
+    rdfs:comment "La propriete dont la peremption decide du verdict." .
+
+:stalenessRatio a owl:DatatypeProperty ;
+    rdfs:label "ratio de peremption" ;
+    rdfs:domain :Verdict ;
+    rdfs:range xsd:decimal ;
+    rdfs:comment "age / horizon. Au-dela de 1, le verdict devient inconnu." .
+
+:issuedAt a owl:DatatypeProperty ;
+    rdfs:label "emis a" ;
+    rdfs:domain :Verdict ;
+    rdfs:range xsd:dateTime ;
+    rdfs:comment """Instant d'emission du verdict, a distinguer de observedAt
+qui date l'observation du fait.""" .
+
+# ---------------------------------------------------------------------------
+# L'ETAT DU JUMEAU LUI-MEME
+#
+# Un jumeau doit pouvoir se decrire : combien de contraintes il a pu trancher,
+# et s'il etait en mesure de trancher du tout.
+# ---------------------------------------------------------------------------
+:TwinState a owl:Class ;
+    rdfs:label "Etat du jumeau" ;
+    rdfs:comment "L'etat d'analyse du jumeau a un instant donne." .
+
+:graphAge a owl:DatatypeProperty ;
+    rdfs:label "age du graphe" ;
+    rdfs:domain :TwinState ;
+    rdfs:range xsd:decimal ;
+    rdfs:comment "Age, en secondes, de l'observation la plus recente." .
+
+:conformCount a owl:DatatypeProperty ;
+    rdfs:label "nombre de conformes" ;
+    rdfs:domain :TwinState ;
+    rdfs:range xsd:integer .
+
+:violatedCount a owl:DatatypeProperty ;
+    rdfs:label "nombre de violations" ;
+    rdfs:domain :TwinState ;
+    rdfs:range xsd:integer .
+
+:unknownCount a owl:DatatypeProperty ;
+    rdfs:label "nombre d'inconnus" ;
+    rdfs:domain :TwinState ;
+    rdfs:range xsd:integer .
+
+:decidable a owl:DatatypeProperty ;
+    rdfs:label "decidable" ;
+    rdfs:domain :TwinState ;
+    rdfs:range xsd:boolean ;
+    rdfs:comment """Faux si au moins une contrainte est indecidable faute
+d'information fraiche. Un jumeau peut etre Synced et pourtant indecidable :
+c'est le diagnostic que ni ArgoCD ni la CRD TwinSync ne savent produire.""" .
