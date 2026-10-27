@@ -4,3 +4,11 @@ sylvatwin-full*.ttl
 snapshots/
 *.bak
 .venv/
+# Secrets / acces cluster : ne jamais commiter
+*kubeconfig*
+*.kubeconfig
+*.token
+*.pem
+*.key
+.env
+__pycache__/
