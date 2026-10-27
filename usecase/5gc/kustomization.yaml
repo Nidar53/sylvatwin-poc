@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: sylvatwin-5gc
+resources:
+  - namespace.yaml   # cree une fois par usecase/bootstrap, puis gere par Flux (get/patch autorises)
+  - networkpolicy.yaml
+  - mongodb.yaml
+  - nrf.yaml
+  - nssf.yaml
+  - ausf.yaml
+  - udm.yaml
+  - udr.yaml
+  - pcf.yaml
+  - bsf.yaml
+  # - smf.yaml   # active en dernier, apres validation du premier lancement (b1-b)
+generatorOptions:
+  disableNameSuffixHash: true   # noms stables : les scenarios de derive visent "smf-config", etc.
+configMapGenerator:
+  - {name: nrf-config,  files: [nrf.yaml=config/nrf.yaml]}
+  - {name: nssf-config, files: [nssf.yaml=config/nssf.yaml]}
+  - {name: ausf-config, files: [ausf.yaml=config/ausf.yaml]}
+  - {name: udm-config,  files: [udm.yaml=config/udm.yaml]}
+  - {name: udr-config,  files: [udr.yaml=config/udr.yaml]}
+  - {name: pcf-config,  files: [pcf.yaml=config/pcf.yaml]}
+  - {name: bsf-config,  files: [bsf.yaml=config/bsf.yaml]}
+  - {name: smf-config,  files: [smf.yaml=config/smf.yaml]}
+  - {name: amf-config,  files: [amf.yaml=config/amf.yaml]}   # reference, jamais executee

@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smf
+  labels: {app.kubernetes.io/name: smf, app.kubernetes.io/part-of: sylvatwin-5gc, sylvatwin.orange.com/nf: smf}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: smf}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: smf, app.kubernetes.io/part-of: sylvatwin-5gc, sylvatwin.orange.com/nf: smf}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        seccompProfile: {type: RuntimeDefault}
+      initContainers:
+        - name: wait-nrf
+          image: gradiant/open5gs:2.7.2
+          command: ["sh", "-c", "until curl -s -m 2 --http2-prior-knowledge -o /dev/null http://nrf.sylvatwin-5gc.svc.cluster.local:7777/nnrf-nfm/v1/nf-instances; do echo attente NRF; sleep 3; done"]
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: ["ALL"]}}
+          resources:
+            requests: {cpu: 5m, memory: 16Mi}
+            limits: {cpu: 50m, memory: 32Mi}
+      containers:
+        - name: smf
+          image: gradiant/open5gs:2.7.2
+          command: ["open5gs-smfd", "-c", "/etc/open5gs/custom/smf.yaml"]
+          ports:
+            - {name: sbi, containerPort: 7777, protocol: TCP}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            capabilities: {drop: ["ALL"]}
+          resources:
+            requests: {cpu: 20m, memory: 64Mi}
+            limits: {cpu: 200m, memory: 256Mi}
+          readinessProbe:
+            tcpSocket: {port: 7777}
+            periodSeconds: 10
+          volumeMounts:
+            - {name: config, mountPath: /etc/open5gs/custom}
+      volumes:
+        - name: config
+          configMap: {name: smf-config}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: smf
+  labels: {app.kubernetes.io/name: smf, app.kubernetes.io/part-of: sylvatwin-5gc}
+spec:
+  selector: {app.kubernetes.io/name: smf}
+  ports:
+    - {name: sbi, port: 7777, targetPort: 7777, protocol: TCP}

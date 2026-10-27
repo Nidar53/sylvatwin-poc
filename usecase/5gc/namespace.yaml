@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sylvatwin-5gc
+  labels:
+    app.kubernetes.io/part-of: sylvatwin-5gc
+    pod-security.kubernetes.io/enforce: restricted

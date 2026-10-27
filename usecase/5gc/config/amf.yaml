@@ -1,0 +1,28 @@
+# ATTENTION : configuration de reference seulement. Aucun processus AMF n'est lance
+# (l'AMF ouvre un serveur SCTP/NGAP, interdit sur ce serveur partage).
+logger: {level: info}
+global: {max: {ue: 64}}
+amf:
+  sbi:
+    server:
+      - dev: eth0
+        port: 7777
+    client:
+      nrf:
+        - uri: http://nrf.sylvatwin-5gc.svc.cluster.local:7777
+  guami:
+    - plmn_id: {mcc: 999, mnc: 70}
+      amf_id: {region: 2, set: 1}
+  tai:
+    - plmn_id: {mcc: 999, mnc: 70}
+      tac: 1
+  plmn_support:
+    - plmn_id: {mcc: 999, mnc: 70}
+      s_nssai:
+        - sst: 1
+  security:
+    integrity_order: [NIA2, NIA1, NIA0]
+    ciphering_order: [NEA0, NEA1, NEA2]
+  network_name: {full: SylvaTwin}
+  amf_name: sylvatwin-amf0
+  time: {t3512: {value: 540}}

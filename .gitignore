@@ -12,3 +12,5 @@ snapshots/
 *.key
 .env
 __pycache__/
+# Le kubeconfig du deployer Flux (token) n'est JAMAIS commite
+usecase/**/*kubeconfig*

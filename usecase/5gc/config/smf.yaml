@@ -1,0 +1,34 @@
+# GTP-U est OBLIGATOIRE dans Open5GS v2.7.2 (src/smf/context.c, smf_context_validation).
+# Il est lie a 127.0.0.1 : socket UDP locale au pod, injoignable de l'exterieur.
+# Volontairement absents : gtpc, freeDiameter, et toute adresse d'UPF.
+logger: {level: info}
+global: {max: {ue: 64}}
+smf:
+  sbi:
+    server:
+      - dev: eth0
+        port: 7777
+        advertise: smf.sylvatwin-5gc.svc.cluster.local
+    client:
+      nrf:
+        - uri: http://nrf.sylvatwin-5gc.svc.cluster.local:7777
+  pfcp:
+    server:
+      - address: 127.0.0.1
+  gtpu:
+    server:
+      - address: 127.0.0.1
+  session:
+    - subnet: 10.45.0.1/16
+      dnn: internet
+  dns:
+    - 8.8.8.8
+  mtu: 1400
+  info:
+    - s_nssai:
+        - sst: 1
+          dnn:
+            - internet
+      tai:
+        - plmn_id: {mcc: 999, mnc: 70}
+          tac: 1

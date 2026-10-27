@@ -1,0 +1,37 @@
+# A appliquer sur le cluster de MANAGEMENT. Utilise le Flux de Sylva (aucun objet Sylva modifie).
+# Le Secret "sylvatwin-5gc-kubeconfig" (kubeconfig du compte ci-dessus, token 30 jours)
+# est cree a part et n'est JAMAIS commite.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sylvatwin-flux
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: sylvatwin-poc
+  namespace: sylvatwin-flux
+spec:
+  interval: 2m
+  url: https://github.com/Nidar53/sylvatwin-poc
+  ref: {branch: test}
+  ignore: |
+    /*
+    !/usecase/5gc/
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: sylvatwin-5gc
+  namespace: sylvatwin-flux
+spec:
+  interval: 2m
+  retryInterval: 1m
+  timeout: 5m
+  path: ./usecase/5gc
+  prune: true
+  wait: false
+  sourceRef: {kind: GitRepository, name: sylvatwin-poc}
+  targetNamespace: sylvatwin-5gc
+  kubeConfig:
+    secretRef: {name: sylvatwin-5gc-kubeconfig, key: value}

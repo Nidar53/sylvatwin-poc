@@ -1,0 +1,64 @@
+# A appliquer UNE FOIS sur le cluster WORKLOAD (avec le kubeconfig admin du proprietaire).
+# Compte utilise par le Flux de Sylva (depuis le management) pour deployer sylvatwin-5gc.
+# Droits : tout dans le namespace sylvatwin-5gc, rien ailleurs ; creation/lecture du seul
+# namespace sylvatwin-5gc.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sylvatwin-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sylvatwin-flux-deployer
+  namespace: sylvatwin-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sylvatwin-flux-deployer-namespace
+rules:
+  # get/patch limites par resourceNames ; list/watch ne peuvent pas l'etre (contrainte RBAC),
+  # mais ne donnent acces qu'aux metadonnees des namespaces.
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    resourceNames: ["sylvatwin-5gc"]
+    verbs: ["get", "patch", "update", "delete"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["create", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sylvatwin-flux-deployer-namespace
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: sylvatwin-flux-deployer-namespace}
+subjects:
+  - {kind: ServiceAccount, name: sylvatwin-flux-deployer, namespace: sylvatwin-system}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sylvatwin-5gc
+  labels:
+    app.kubernetes.io/part-of: sylvatwin-5gc
+    pod-security.kubernetes.io/enforce: restricted
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sylvatwin-flux-deployer
+  namespace: sylvatwin-5gc
+rules:
+  - apiGroups: ["", "apps", "networking.k8s.io"]
+    resources: ["configmaps", "services", "persistentvolumeclaims", "deployments", "networkpolicies", "pods", "replicasets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sylvatwin-flux-deployer
+  namespace: sylvatwin-5gc
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: sylvatwin-flux-deployer}
+subjects:
+  - {kind: ServiceAccount, name: sylvatwin-flux-deployer, namespace: sylvatwin-system}

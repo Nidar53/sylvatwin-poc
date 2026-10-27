@@ -1,0 +1,12 @@
+db_uri: mongodb://mongodb.sylvatwin-5gc.svc.cluster.local/open5gs
+logger: {level: info}
+global: {max: {ue: 64}}
+pcf:
+  sbi:
+    server:
+      - dev: eth0
+        port: 7777
+        advertise: pcf.sylvatwin-5gc.svc.cluster.local
+    client:
+      nrf:
+        - uri: http://nrf.sylvatwin-5gc.svc.cluster.local:7777

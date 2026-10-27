@@ -1,0 +1,14 @@
+logger: {level: info}
+global: {max: {ue: 64}}
+nssf:
+  sbi:
+    server:
+      - dev: eth0
+        port: 7777
+        advertise: nssf.sylvatwin-5gc.svc.cluster.local
+    client:
+      nrf:
+        - uri: http://nrf.sylvatwin-5gc.svc.cluster.local:7777
+      nsi:
+        - uri: http://nrf.sylvatwin-5gc.svc.cluster.local:7777
+          s_nssai: {sst: 1}

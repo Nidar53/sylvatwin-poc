@@ -1,0 +1,20 @@
+logger: {level: info}
+global: {max: {ue: 64}}
+udm:
+  # Cles SUCI (chiffrement de l'identite abonne) : lues depuis le Secret udm-keys,
+  # cree HORS Git (scenario D3). Les valeurs ne sont jamais dans le depot.
+  hnet:
+    - id: 1
+      scheme: 1
+      key: /etc/open5gs/hnet/curve25519-1.key
+    - id: 2
+      scheme: 2
+      key: /etc/open5gs/hnet/secp256r1-2.key
+  sbi:
+    server:
+      - dev: eth0
+        port: 7777
+        advertise: udm.sylvatwin-5gc.svc.cluster.local
+    client:
+      nrf:
+        - uri: http://nrf.sylvatwin-5gc.svc.cluster.local:7777

@@ -1,0 +1,26 @@
+# Seuls TCP 7777 (SBI) et TCP 27017 (MongoDB) sont autorises entre pods du namespace,
+# plus le DNS sortant. Tout autre trafic entrant est refuse.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sylvatwin-5gc-default
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {}
+      ports:
+        - {protocol: TCP, port: 7777}
+        - {protocol: TCP, port: 27017}
+  egress:
+    - to:
+        - podSelector: {}
+      ports:
+        - {protocol: TCP, port: 7777}
+        - {protocol: TCP, port: 27017}
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
