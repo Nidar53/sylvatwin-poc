@@ -12,7 +12,7 @@ resources:
   - udr.yaml
   - pcf.yaml
   - bsf.yaml
-  # - smf.yaml   # active en dernier, apres validation du premier lancement (b1-b)
+  - smf.yaml   # b1-b : GTP-U sur 127.0.0.1 seulement, ni gtpc ni diameter, aucun UPF
 generatorOptions:
   disableNameSuffixHash: true   # noms stables : les scenarios de derive visent "smf-config", etc.
 configMapGenerator:
