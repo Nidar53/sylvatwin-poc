@@ -1,0 +1,42 @@
+# UPF : demande NET_ADMIN, root dans le conteneur et /dev/net/tun du noeud (hostPath CharDevice).
+# L'entrypoint de l'image (sysctl, ip_forward, iptables NAT) est volontairement CONTOURNE : command direct.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: upf
+  labels: {app.kubernetes.io/name: upf, app.kubernetes.io/part-of: sylvatwin-5gc, sylvatwin.orange.com/nf: upf}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: upf}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: upf, app.kubernetes.io/part-of: sylvatwin-5gc, sylvatwin.orange.com/nf: upf}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: upf
+          image: gradiant/open5gs:2.7.2
+          command: ["open5gs-upfd", "-c", "/etc/open5gs/custom/upf.yaml"]
+          securityContext:
+            runAsUser: 0                      # creation de l'interface tun : root dans le conteneur
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            privileged: false                 # PAS privileged : seulement NET_ADMIN
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_ADMIN"]
+          resources:
+            requests: {cpu: 20m, memory: 64Mi}
+            limits: {cpu: 200m, memory: 256Mi}
+          volumeMounts:
+            - {name: config, mountPath: /etc/open5gs/custom}
+            - {name: dev-net-tun, mountPath: /dev/net/tun}
+      volumes:
+        - name: config
+          configMap: {name: upf-config}
+        - name: dev-net-tun
+          hostPath: {path: /dev/net/tun, type: CharDevice}

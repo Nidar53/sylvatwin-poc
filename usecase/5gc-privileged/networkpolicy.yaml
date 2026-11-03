@@ -1,0 +1,25 @@
+# Aucun trafic entrant sauf SBI de l'AMF depuis sylvatwin-5gc ; sorties : SBI vers sylvatwin-5gc et DNS.
+# PFCP / GTP-U / NGAP sont sur 127.0.0.1 et n'ont donc besoin d'aucune regle.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sylvatwin-5gc-priv-default
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: sylvatwin-5gc}}
+        - podSelector: {}
+      ports:
+        - {protocol: TCP, port: 7777}
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: sylvatwin-5gc}}
+      ports:
+        - {protocol: TCP, port: 7777}
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}

@@ -1,0 +1,14 @@
+# NE PAS referencer depuis Flux tant que l'administrateur n'a pas valide (voir README.md).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: sylvatwin-5gc-priv
+resources:
+  - namespace.yaml
+  - networkpolicy.yaml
+  - amf.yaml
+  - upf.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - {name: amf-config, files: [amf.yaml=config/amf.yaml]}
+  - {name: upf-config, files: [upf.yaml=config/upf.yaml]}

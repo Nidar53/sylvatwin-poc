@@ -1,0 +1,11 @@
+# Namespace SEPARE de sylvatwin-5gc : on garde "restricted" pour les 9 NF ordinaires,
+# et on isole ici les deux fonctions qui touchent le noyau partage.
+# "privileged" est exige par l'UPF (NET_ADMIN + hostPath /dev/net/tun). A VALIDER.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sylvatwin-5gc-priv
+  labels:
+    app.kubernetes.io/part-of: sylvatwin-5gc
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/warn: restricted     # avertit quand meme a chaque ecart

@@ -1,0 +1,15 @@
+# UPF Open5GS v2.7.2. PFCP et GTP-U lies a 127.0.0.1 (injoignables hors du pod).
+# L'interface ogstun est creee par le processus dans le namespace reseau du pod.
+logger: {level: info}
+global: {max: {ue: 64}}
+upf:
+  pfcp:
+    server:
+      - address: 127.0.0.1
+  gtpu:
+    server:
+      - address: 127.0.0.1
+  session:
+    - subnet: 10.45.0.0/16
+      gateway: 10.45.0.1
+      dev: ogstun
