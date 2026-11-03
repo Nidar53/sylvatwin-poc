@@ -12,6 +12,7 @@ resources:
   - udr.yaml
   - pcf.yaml
   - bsf.yaml
+  - scp.yaml   # SBI seulement (TCP 7777)
   - smf.yaml   # b1-b : GTP-U sur 127.0.0.1 seulement, ni gtpc ni diameter, aucun UPF
 generatorOptions:
   disableNameSuffixHash: true   # noms stables : les scenarios de derive visent "smf-config", etc.
@@ -24,4 +25,5 @@ configMapGenerator:
   - {name: pcf-config,  files: [pcf.yaml=config/pcf.yaml]}
   - {name: bsf-config,  files: [bsf.yaml=config/bsf.yaml]}
   - {name: smf-config,  files: [smf.yaml=config/smf.yaml]}
+  - {name: scp-config,  files: [scp.yaml=config/scp.yaml]}
   - {name: amf-config,  files: [amf.yaml=config/amf.yaml]}   # reference, jamais executee

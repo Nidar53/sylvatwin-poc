@@ -1,0 +1,14 @@
+# SCP (Service Communication Proxy) : relais HTTP/2 optionnel entre NF (communication "indirecte").
+# SBI uniquement (TCP 7777). Aucune NF n'est configuree pour passer par lui : il s'enregistre
+# aupres du NRF et reste disponible. Le basculement en mode indirect serait un choix separe.
+logger: {level: info}
+global: {max: {ue: 64}}
+scp:
+  sbi:
+    server:
+      - dev: eth0
+        port: 7777
+        advertise: scp.sylvatwin-5gc.svc.cluster.local
+    client:
+      nrf:
+        - uri: http://nrf.sylvatwin-5gc.svc.cluster.local:7777
