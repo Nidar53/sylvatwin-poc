@@ -1,21 +1,15 @@
-# AMF et UPF : fichiers préparés, NON DÉPLOYÉS
+# UPF : fichiers préparés, NON DÉPLOYÉS
 
 **Ce dossier n'est référencé par AUCUNE Kustomization Flux.** Il ne tourne pas.
 Il ne doit être appliqué qu'après une validation écrite de l'administrateur du serveur partagé.
 
-Ces deux fonctions touchent le noyau partagé du serveur :
+L'UPF touche le noyau partagé du serveur :
 - les nœuds CAPD sont des conteneurs Docker ;
 - tous les pods partagent donc le noyau de l'hôte « pas-la-friteuse ».
 
-## AMF : besoin de SCTP
+## AMF
 
-- Il ouvre un serveur **SCTP** (protocole NGAP, port 38412) vers les antennes (gNB). C'est obligatoire dans le code v2.7.2 :
-  - `src/amf/init.c` appelle `ngap_open()` ;
-  - `src/amf/context.c` arrête l'AMF avec « No amf.ngap.address » s'il n'y a pas d'adresse NGAP ;
-  - `src/amf/ngap-sctp.c` et `lib/sctp/ogs-lksctp.c` appellent `socket(..., IPPROTO_SCTP)`.
-- Il utilise le module noyau **`sctp`**. Ce module est déjà chargé sur l'hôte depuis l'incident du 22/10 : il ne serait pas chargé une nouvelle fois, mais le SCTP du noyau partagé serait **utilisé activement**.
-- Il ne demande **aucune** capacité Linux, aucun périphérique et aucun privilège. Sa PodSecurity reste **restricted** : seul le module noyau pose question.
-- Choix de prudence : NGAP lié à **127.0.0.1** (`ngap.server.address`). Le serveur SCTP n'est donc joignable que depuis l'intérieur du pod, tant qu'aucun gNB n'est déployé.
+L'AMF a été déplacé dans `usecase/5gc` (namespace `sylvatwin-5gc`, PodSecurity restricted), après l'accord de l'administrateur du 06/11/2026. Il n'a besoin d'aucun privilège : seulement le module `sctp` de l'hôte, déjà chargé.
 
 ## UPF : besoin de tun et de NET_ADMIN
 

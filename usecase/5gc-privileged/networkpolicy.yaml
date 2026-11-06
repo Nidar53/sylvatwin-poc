@@ -1,4 +1,4 @@
-# Aucun trafic entrant sauf SBI de l'AMF depuis sylvatwin-5gc ; sorties : SBI vers sylvatwin-5gc et DNS.
+# Temps 2 (a revoir) : regles de l UPF. PFCP/GTP-U sur 127.0.0.1 pour l instant.
 # PFCP / GTP-U / NGAP sont sur 127.0.0.1 et n'ont donc besoin d'aucune regle.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

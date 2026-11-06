@@ -12,6 +12,7 @@ resources:
   - udr.yaml
   - pcf.yaml
   - bsf.yaml
+  - amf.yaml   # NGAP (SCTP 38412) sur 127.0.0.1 ; accord admin du 06/11/2026
   - scp.yaml   # SBI seulement (TCP 7777)
   - smf.yaml   # b1-b : GTP-U sur 127.0.0.1 seulement, ni gtpc ni diameter, aucun UPF
 generatorOptions:
@@ -26,4 +27,4 @@ configMapGenerator:
   - {name: bsf-config,  files: [bsf.yaml=config/bsf.yaml]}
   - {name: smf-config,  files: [smf.yaml=config/smf.yaml]}
   - {name: scp-config,  files: [scp.yaml=config/scp.yaml]}
-  - {name: amf-config,  files: [amf.yaml=config/amf.yaml]}   # reference, jamais executee
+  - {name: amf-config,  files: [amf.yaml=config/amf.yaml]}

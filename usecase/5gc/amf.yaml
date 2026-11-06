@@ -1,5 +1,3 @@
-# AMF : PodSecurity "restricted" respectee (non root, aucune capacite). Seul point a valider :
-# utilisation du module noyau sctp de l'hote (deja charge) via une socket SCTP sur 127.0.0.1.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,6 +17,14 @@ spec:
         runAsUser: 999
         runAsGroup: 999
         seccompProfile: {type: RuntimeDefault}
+      initContainers:
+        - name: wait-nrf
+          image: gradiant/open5gs:2.7.2
+          command: ["sh", "-c", "until curl -s -m 2 --http2-prior-knowledge -o /dev/null http://nrf.sylvatwin-5gc.svc.cluster.local:7777/nnrf-nfm/v1/nf-instances; do echo attente NRF; sleep 3; done"]
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: ["ALL"]}}
+          resources:
+            requests: {cpu: 5m, memory: 16Mi}
+            limits: {cpu: 50m, memory: 32Mi}
       containers:
         - name: amf
           image: gradiant/open5gs:2.7.2

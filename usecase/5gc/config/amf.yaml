@@ -1,5 +1,5 @@
-# ATTENTION : configuration de reference seulement. Aucun processus AMF n'est lance
-# (l'AMF ouvre un serveur SCTP/NGAP, interdit sur ce serveur partage).
+# AMF execute depuis le 06/11/2026 (accord de l'administrateur : modifications necessaires uniquement).
+# NGAP (SCTP 38412) lie a 127.0.0.1 : utilise le module sctp de l'hote (deja charge), injoignable hors du pod.
 logger: {level: info}
 global: {max: {ue: 64}}
 amf:
@@ -7,9 +7,13 @@ amf:
     server:
       - dev: eth0
         port: 7777
+        advertise: amf.sylvatwin-5gc.svc.cluster.local
     client:
       nrf:
         - uri: http://nrf.sylvatwin-5gc.svc.cluster.local:7777
+  ngap:
+    server:
+      - address: 127.0.0.1
   guami:
     - plmn_id: {mcc: 999, mnc: 70}
       amf_id: {region: 2, set: 1}
