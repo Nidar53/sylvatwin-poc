@@ -1,0 +1,113 @@
+@prefix :     <https://w3id.org/sylvatwin/core#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@base         <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/> .
+
+# =============================================================================
+# Exemple d'instances pour sylvatwin-core-v1.ttl (version A).
+#
+# Photo REELLE du cluster workload, prise le 2026-11-08T13:40:53Z en lecture
+# seule (kubectl get), pour le Deployment udm du namespace sylvatwin-5gc.
+# Rien n'est invente, sauf l'absence d'injection : c'est l'etat SANS derive.
+#
+# Schema d'IRI (decision D1) :
+#   https://w3id.org/sylvatwin/res/<cluster>/<namespace>/<Kind>/<nom>
+#   objet sans namespace : <cluster>/_/<Kind>/<nom>
+#   Label : <IRI de l'objet>/label/<cle>  ou  <IRI du Deployment>/nodeSelector/<cle>
+#           ('/' de la cle encode en %2F)
+# Le @base ci-dessus vaut <cluster>/ ; <sylvatwin-5gc/Deployment/udm> est donc
+# https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Deployment/udm
+#
+# Etat reel observe :
+#   - udm n'a PAS de nodeSelector dans Git (aucun triplet :requiresNodeLabel) ;
+#     S1 n'est donc pas declenchable tel quel (voir la procedure de label).
+#   - le Secret udm-keys existe (uid observe) mais n'est pas dans Git.
+# Les variantes avec derive (S0 cas A et B, S1, S2) sont construites a partir de
+# ce fichier par le script de verification, pas ecrites ici.
+# =============================================================================
+
+# --- Namespace ----------------------------------------------------------------
+<_/Namespace/sylvatwin-5gc> a :Namespace ;
+    :clusterName "my-workload-kubeadm-capd" ;
+    :resourceName "sylvatwin-5gc" ;
+    :uid "8490205e-47fa-4366-832b-0713ebfbef25" ;
+    :observedAt "2026-11-08T13:40:53Z"^^xsd:dateTime .
+
+# --- Deployment : les trois valeurs de replicas sur le meme individu ----------
+<sylvatwin-5gc/Deployment/udm> a :Deployment ;
+    :clusterName "my-workload-kubeadm-capd" ;
+    :resourceName "udm" ;
+    :inNamespace <_/Namespace/sylvatwin-5gc> ;
+    :uid "fd119f6f-65ff-444e-a113-48f390eb63e3" ;
+    :desiredRevision "test@sha1:39f14dedee3535afe74726e97330e4eacf34ed8a" ;
+    :desiredReplicas 1 ;          # Git : usecase/5gc/udm.yaml, spec.replicas
+    :observedSpecReplicas 1 ;     # cluster : spec.replicas
+    :actualReplicas 1 ;           # cluster : status.readyReplicas
+    :referencesSecret <sylvatwin-5gc/Secret/udm-keys> ;   # volumes[udm-keys].secret.secretName
+    :observedAt "2026-11-08T13:40:53Z"^^xsd:dateTime .
+
+# --- ReplicaSet (ownerReferences -> Deployment/udm, controller=true) ----------
+<sylvatwin-5gc/ReplicaSet/udm-7cf6c5b78d> a :ReplicaSet ;
+    :clusterName "my-workload-kubeadm-capd" ;
+    :resourceName "udm-7cf6c5b78d" ;
+    :inNamespace <_/Namespace/sylvatwin-5gc> ;
+    :uid "39ac6715-f499-4517-9aed-80c9533f5841" ;
+    :ownedBy <sylvatwin-5gc/Deployment/udm> ;
+    :observedAt "2026-11-08T13:40:53Z"^^xsd:dateTime .
+
+# --- Pod (ownerReferences -> ReplicaSet/udm-7cf6c5b78d) -----------------------
+<sylvatwin-5gc/Pod/udm-7cf6c5b78d-rw6fk> a :Pod ;
+    :clusterName "my-workload-kubeadm-capd" ;
+    :resourceName "udm-7cf6c5b78d-rw6fk" ;
+    :inNamespace <_/Namespace/sylvatwin-5gc> ;
+    :uid "03ddabb2-a6fa-4dcd-b954-5920204c11d3" ;
+    :ownedBy <sylvatwin-5gc/ReplicaSet/udm-7cf6c5b78d> ;
+    :runsOn <_/Node/my-workload-kubeadm-capd-control-plane-6w58l> ;
+    :podPhase "Running" ;
+    :observedAt "2026-11-08T13:40:53Z"^^xsd:dateTime .
+
+# --- Node et ses 7 labels reels -----------------------------------------------
+<_/Node/my-workload-kubeadm-capd-control-plane-6w58l> a :Node ;
+    :clusterName "my-workload-kubeadm-capd" ;
+    :resourceName "my-workload-kubeadm-capd-control-plane-6w58l" ;
+    :uid "2fd24ea5-3f64-4403-8bc9-fdf6d9f183d0" ;
+    :hasLabel
+        <_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/beta.kubernetes.io%2Farch> ,
+        <_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/beta.kubernetes.io%2Fos> ,
+        <_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/cluster> ,
+        <_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/kubernetes.io%2Farch> ,
+        <_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/kubernetes.io%2Fhostname> ,
+        <_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/kubernetes.io%2Fos> ,
+        <_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/node-role.kubernetes.io%2Fcontrol-plane> ,
+        <_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/node.kubernetes.io%2Fexclude-from-external-load-balancers> ;
+    :observedAt "2026-11-08T13:40:53Z"^^xsd:dateTime .
+
+<_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/beta.kubernetes.io%2Farch> a :Label ;
+    :hasKey "beta.kubernetes.io/arch" ; :hasValue "amd64" .
+<_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/beta.kubernetes.io%2Fos> a :Label ;
+    :hasKey "beta.kubernetes.io/os" ; :hasValue "linux" .
+<_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/cluster> a :Label ;
+    :hasKey "cluster" ; :hasValue "my-workload-kubeadm-capd" .
+<_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/kubernetes.io%2Farch> a :Label ;
+    :hasKey "kubernetes.io/arch" ; :hasValue "amd64" .
+<_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/kubernetes.io%2Fhostname> a :Label ;
+    :hasKey "kubernetes.io/hostname" ; :hasValue "my-workload-kubeadm-capd-control-plane-6w58l" .
+<_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/kubernetes.io%2Fos> a :Label ;
+    :hasKey "kubernetes.io/os" ; :hasValue "linux" .
+<_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/node-role.kubernetes.io%2Fcontrol-plane> a :Label ;
+    :hasKey "node-role.kubernetes.io/control-plane" ; :hasValue "" .
+<_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/node.kubernetes.io%2Fexclude-from-external-load-balancers> a :Label ;
+    :hasKey "node.kubernetes.io/exclude-from-external-load-balancers" ; :hasValue "" .
+
+# --- Secret (existence seulement, jamais le contenu) --------------------------
+# Cree hors Git (scenario D3 = S2). Le :uid prouve qu'il a ete vu dans le cluster.
+<sylvatwin-5gc/Secret/udm-keys> a :Secret ;
+    :clusterName "my-workload-kubeadm-capd" ;
+    :resourceName "udm-keys" ;
+    :inNamespace <_/Namespace/sylvatwin-5gc> ;
+    :uid "184ff885-76c8-4bf9-8d8a-6473a09ca7ff" ;
+    :hasLabel <sylvatwin-5gc/Secret/udm-keys/label/sylvatwin.orange.com%2Fhors-git> ;
+    :observedAt "2026-11-08T13:40:53Z"^^xsd:dateTime .
+
+<sylvatwin-5gc/Secret/udm-keys/label/sylvatwin.orange.com%2Fhors-git> a :Label ;
+    :hasKey "sylvatwin.orange.com/hors-git" ; :hasValue "true" .

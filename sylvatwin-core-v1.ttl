@@ -1,0 +1,402 @@
+@prefix :        <https://w3id.org/sylvatwin/core#> .
+@prefix owl:     <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+# =============================================================================
+# SylvaTwin — ontologie MINIMALE (version A), v1.0.0
+#
+# Fichier NOUVEAU. Il ne remplace pas sylvatwin-slice-v0.ttl, garde pour
+# comparaison. Espace de noms DIFFERENT (…/core#) : les deux fichiers peuvent
+# etre charges ensemble sans collision (dans v0, requiresNodeLabel est une
+# DatatypeProperty ; ici c'est une ObjectProperty).
+#
+# Decisions appliquees (08/11/2026) :
+#   D1  IRI des individus : https://w3id.org/sylvatwin/res/<cluster>/<namespace>/<Kind>/<nom>
+#       objets sans namespace : segment fixe "_"  (ex. …/<cluster>/_/Node/<nom>)
+#       l'uid Kubernetes est une simple data property (:uid).
+#   D2  ReplicaSet = classe a part entiere ; Pod -> ReplicaSet -> Deployment
+#       uniquement via metadata.ownerReferences (:ownedBy), jamais via le label app.
+#   D3  Replicas : TROIS valeurs sur le meme individu (Option C etendue)
+#       Git (:desiredReplicas) / spec observee (:observedSpecReplicas) /
+#       status observe (:actualReplicas).
+#   D4  Cote desire = GitRepository Flux reel (:desiredRevision = "test@sha1:…").
+#   Labels structures : classe :Label avec :hasKey / :hasValue.
+#
+# Separation greffier / juge :
+#   - annotation :writtenBy "greffier" : fait brut ecrit par l'operateur ;
+#   - annotation :writtenBy "juge"     : ecrit UNIQUEMENT par les regles
+#     (SHACL/SPARQL). L'operateur n'ecrit jamais une classe Drift ni :affects.
+#
+# Scenarios : S0 = replicas (ConfigurationDrift), S1 = placement (PlacementDrift),
+#             S2 = reference a un Secret cassee (BrokenReferenceDrift).
+# =============================================================================
+
+<https://w3id.org/sylvatwin/core> a owl:Ontology ;
+    owl:versionIRI <https://w3id.org/sylvatwin/core/1.0.0> ;
+    owl:versionInfo "1.0.0" ;
+    dcterms:title "SylvaTwin — ontologie minimale (version A) : Kubernetes natif, scenarios S0, S1, S2"@fr ;
+    dcterms:creator "Ahmed Nidhar Sebihi" ;
+    dcterms:created "2026-11-08"^^xsd:date ;
+    rdfs:comment """Version minimale pour comprendre : 8 classes du domaine Kubernetes et 6 classes
+de derive. Les couches Flux, Cluster API et fonctions reseau viendront dans la
+version complete (B), qui prolongera ces classes sans les modifier."""@fr ;
+    rdfs:seeAlso <https://w3id.org/sylvatwin/k8s> .
+
+# -----------------------------------------------------------------------------
+# Annotations de documentation (aucun effet logique)
+# -----------------------------------------------------------------------------
+dcterms:title   a owl:AnnotationProperty .
+dcterms:creator a owl:AnnotationProperty .
+dcterms:created a owl:AnnotationProperty .
+
+:usedInScenario a owl:AnnotationProperty ;
+    rdfs:label "utilise dans le scenario"@fr ;
+    rdfs:comment "Scenario(s) de derive qui ont besoin de ce terme : S0, S1 ou S2."@fr .
+
+:writtenBy a owl:AnnotationProperty ;
+    rdfs:label "ecrit par"@fr ;
+    rdfs:comment """Qui a le droit d'ecrire ce terme dans le graphe : "greffier" (l'operateur,
+faits observes ou lus dans Git) ou "juge" (les regles de detection)."""@fr .
+
+:k8sSource a owl:AnnotationProperty ;
+    rdfs:label "source Kubernetes"@fr ;
+    rdfs:comment "Champ Kubernetes ou Git d'ou le greffier tire la valeur."@fr .
+
+# =============================================================================
+# 1. CLASSES DU DOMAINE (ecrites par le greffier)
+# =============================================================================
+
+:KubernetesResource a owl:Class ;
+    rdfs:label "ressource Kubernetes"@fr , "Kubernetes resource"@en ;
+    rdfs:comment """Parent commun de tous les objets Kubernetes du jumeau. Porte ce que tout objet
+possede : son cluster, son nom, son uid, son namespace et l'instant ou on l'a observe.
+Un individu de cette classe qui a un :uid a ete VU dans le cluster ; sans :uid, on
+sait seulement que quelque chose le reference (utile pour S2)."""@fr ;
+    :usedInScenario "S0" , "S1" , "S2" ;
+    :writtenBy "greffier" .
+
+:Namespace a owl:Class ; rdfs:subClassOf :KubernetesResource ;
+    rdfs:label "namespace"@fr , "Namespace"@en ;
+    rdfs:comment """Espace de noms Kubernetes. Sert a distinguer deux objets de meme nom (par
+exemple deux Deployments "coredns" dans deux namespaces ou deux clusters).
+Il n'a pas lui-meme de namespace : IRI …/<cluster>/_/Namespace/<nom>."""@fr ;
+    :usedInScenario "S0" , "S1" , "S2" ;
+    :writtenBy "greffier" .
+
+:Deployment a owl:Class ; rdfs:subClassOf :KubernetesResource ;
+    rdfs:label "Deployment"@fr , "Deployment"@en ;
+    rdfs:comment """L'objet declare dans Git qui porte l'intention : le nombre de replicas (S0),
+l'exigence de placement nodeSelector (S1) et les Secrets dont ses pods ont
+besoin (S2). C'est le seul individu qui porte les trois valeurs de replicas."""@fr ;
+    :usedInScenario "S0" , "S1" , "S2" ;
+    :writtenBy "greffier" .
+
+:ReplicaSet a owl:Class ; rdfs:subClassOf :KubernetesResource ;
+    rdfs:label "ReplicaSet"@fr , "ReplicaSet"@en ;
+    rdfs:comment """Le maillon reel entre un Pod et son Deployment. Kubernetes l'ecrit dans les
+ownerReferences : Pod -> ReplicaSet -> Deployment. Le garder dans le graphe evite
+de deviner le Deployment par un label (le label "app" n'existe pas sur les pods
+Open5GS). Les anciens ReplicaSets a 0 replica restent visibles (historique des
+deploiements)."""@fr ;
+    :usedInScenario "S1" ;
+    :writtenBy "greffier" .
+
+:Pod a owl:Class ; rdfs:subClassOf :KubernetesResource ;
+    rdfs:label "Pod"@fr , "Pod"@en ;
+    rdfs:comment """Ce qui tourne vraiment, a un endroit precis. N'existe que du cote observe :
+Git ne decrit jamais un Pod. Pour S1, c'est le Pod (pas le Deployment) qui est
+mal place."""@fr ;
+    :usedInScenario "S1" ;
+    :writtenBy "greffier" .
+
+:Node a owl:Class ; rdfs:subClassOf :KubernetesResource ;
+    rdfs:label "noeud"@fr , "Node"@en ;
+    rdfs:comment """La machine sur laquelle tournent les pods (en CAPD : un conteneur Docker).
+Elle n'est pas decrite dans Git ; seuls ses labels observes comptent pour S1.
+Pas de namespace : IRI …/<cluster>/_/Node/<nom>."""@fr ;
+    :usedInScenario "S1" ;
+    :writtenBy "greffier" .
+
+:Secret a owl:Class ; rdfs:subClassOf :KubernetesResource ;
+    rdfs:label "Secret"@fr , "Secret"@en ;
+    rdfs:comment """Un Secret Kubernetes. Le jumeau n'en stocke JAMAIS le contenu : seulement son
+existence (uid, observedAt). Pour S2, la question est : un Deployment reference-t-il
+un Secret qui n'a pas (ou plus) d'existence observee ?"""@fr ;
+    :usedInScenario "S2" ;
+    :writtenBy "greffier" .
+
+:Label a owl:Class ;
+    rdfs:label "label"@fr , "Label"@en ;
+    rdfs:comment """Un couple cle/valeur, structure (:hasKey, :hasValue) au lieu de la chaine
+"cle=valeur" de la v0. Les regles comparent la cle et la valeur, jamais l'IRI du
+Label : le cote Git (nodeSelector) et le cote cluster (labels du noeud) n'ont plus
+besoin de partager une convention d'ecriture. Un Label n'est pas une ressource
+Kubernetes : il appartient a un objet (IRI …/<objet>/label/<cle encodee> ou
+…/<objet>/nodeSelector/<cle encodee>)."""@fr ;
+    :usedInScenario "S1" ;
+    :writtenBy "greffier" .
+
+[] a owl:AllDisjointClasses ;
+    owl:members ( :Namespace :Deployment :ReplicaSet :Pod :Node :Secret ) .
+
+:Label owl:disjointWith :KubernetesResource .
+
+# =============================================================================
+# 2. CLASSES DE DERIVE (ecrites UNIQUEMENT par le juge)
+# =============================================================================
+
+:Drift a owl:Class ;
+    rdfs:label "derive"@fr , "Drift"@en ;
+    rdfs:comment """Ecart constate par une regle entre l'etat desire et l'etat observe. Jamais ecrit
+par l'operateur : c'est le resultat d'une regle SHACL ou SPARQL."""@fr ;
+    owl:disjointWith :KubernetesResource , :Label ;
+    :usedInScenario "S0" , "S1" , "S2" ;
+    :writtenBy "juge" .
+
+:ConfigurationDrift a owl:Class ; rdfs:subClassOf :Drift ;
+    rdfs:label "derive de configuration"@fr , "Configuration drift"@en ;
+    rdfs:comment """S0 : le nombre de replicas n'est pas le meme partout. Deux sous-cas distincts,
+grace aux trois valeurs portees par le Deployment."""@fr ;
+    :usedInScenario "S0" ;
+    :writtenBy "juge" .
+
+:SpecDrift a owl:Class ; rdfs:subClassOf :ConfigurationDrift ;
+    rdfs:label "spec modifiee a la main"@fr , "Spec drift"@en ;
+    rdfs:comment """S0, cas A : la spec du cluster ne correspond plus a Git
+(desiredReplicas != observedSpecReplicas). Exemple : quelqu'un a fait
+"kubectl scale". Flux la corrigera a son prochain intervalle."""@fr ;
+    :usedInScenario "S0" ;
+    :writtenBy "juge" .
+
+:ConvergenceDrift a owl:Class ; rdfs:subClassOf :ConfigurationDrift ;
+    rdfs:label "Kubernetes n'a pas converge"@fr , "Convergence drift"@en ;
+    rdfs:comment """S0, cas B : la spec est conforme a Git, mais le cluster n'atteint pas ce qu'elle
+demande (observedSpecReplicas != actualReplicas). Exemple : un pod ne peut pas etre
+cree ou planifie. Flux ne voit rien : la spec est conforme. Une regle doit tolerer
+les ecarts transitoires (deploiement en cours) : c'est le role du verdict date."""@fr ;
+    :usedInScenario "S0" ;
+    :writtenBy "juge" .
+
+:PlacementDrift a owl:Class ; rdfs:subClassOf :Drift ;
+    rdfs:label "derive de placement"@fr , "Placement drift"@en ;
+    rdfs:comment """S1 : un Pod tourne sur un noeud qui ne porte plus un label exige par le
+nodeSelector de son Deployment. Kubernetes n'evince pas le pod ; Flux ne regarde
+pas les noeuds. Derive inter-couches (workload <-> infrastructure)."""@fr ;
+    :usedInScenario "S1" ;
+    :writtenBy "juge" .
+
+:BrokenReferenceDrift a owl:Class ; rdfs:subClassOf :Drift ;
+    rdfs:label "reference cassee"@fr , "Broken reference drift"@en ;
+    rdfs:comment """S2 : un Deployment reference un Secret qui n'existe pas dans le cluster. Le pod
+qui tourne deja continue ; il ne pourra plus redemarrer. Si le Secret est hors
+Git (cas de udm-keys), ni Flux ni kubectl diff ne le voient."""@fr ;
+    :usedInScenario "S2" ;
+    :writtenBy "juge" .
+
+# =============================================================================
+# 3. OBJECT PROPERTIES
+# =============================================================================
+
+:inNamespace a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:label "dans le namespace"@fr ;
+    rdfs:domain :KubernetesResource ;
+    rdfs:range :Namespace ;
+    rdfs:comment "Namespace de l'objet. Absent pour les objets sans namespace (Node, Namespace)."@fr ;
+    :k8sSource "metadata.namespace" ;
+    :usedInScenario "S0" , "S1" , "S2" ;
+    :writtenBy "greffier" .
+
+:ownedBy a owl:ObjectProperty ;
+    rdfs:label "appartient a"@fr ;
+    rdfs:domain :KubernetesResource ;
+    rdfs:range :KubernetesResource ;
+    rdfs:comment """Copie fidele de metadata.ownerReferences : Pod -> ReplicaSet et
+ReplicaSet -> Deployment. Le Deployment d'un Pod s'obtient par le chemin
+SPARQL ":ownedBy+", sans raisonneur. Domaine et portee volontairement generiques :
+dans Kubernetes, le proprietaire peut etre un Node (pods statiques de kube-system),
+un Job, un StatefulSet… Une portee plus etroite ferait conclure a tort qu'un Node
+est un ReplicaSet."""@fr ;
+    :k8sSource "metadata.ownerReferences[].{kind,name}" ;
+    :usedInScenario "S1" ;
+    :writtenBy "greffier" .
+
+:runsOn a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:label "tourne sur"@fr ;
+    rdfs:domain :Pod ;
+    rdfs:range :Node ;
+    rdfs:comment """Le noeud sur lequel le Pod a ete place. Absent si le Pod n'est pas encore
+planifie (Pending) : un pod non place n'est pas mal place. Relation inter-couches
+au coeur de S1."""@fr ;
+    :k8sSource "Pod.spec.nodeName" ;
+    :usedInScenario "S1" ;
+    :writtenBy "greffier" .
+
+:hasLabel a owl:ObjectProperty ;
+    rdfs:label "porte le label"@fr ;
+    rdfs:domain :KubernetesResource ;
+    rdfs:range :Label ;
+    rdfs:comment """Label OBSERVE sur un objet du cluster. En version A, seul celui des Nodes sert
+(S1). Le greffier ecrit tous les labels, sans filtrer : filtrer, ce serait deja juger."""@fr ;
+    :k8sSource "metadata.labels" ;
+    :usedInScenario "S1" ;
+    :writtenBy "greffier" .
+
+:requiresNodeLabel a owl:ObjectProperty ;
+    rdfs:label "exige le label de noeud"@fr ;
+    rdfs:domain :Deployment ;
+    rdfs:range :Label ;
+    rdfs:comment """Exigence de placement DECLAREE dans Git : chaque entree du nodeSelector du
+pod template devient un Label. S1 compare ces Labels (cle et valeur) a ceux du
+noeud sur lequel tourne chaque Pod."""@fr ;
+    :k8sSource "Git : Deployment.spec.template.spec.nodeSelector" ;
+    :usedInScenario "S1" ;
+    :writtenBy "greffier" .
+
+:referencesSecret a owl:ObjectProperty ;
+    rdfs:label "reference le Secret"@fr ;
+    rdfs:domain :Deployment ;
+    rdfs:range :Secret ;
+    rdfs:comment """Le pod template du Deployment a besoin de ce Secret (volume, env, envFrom,
+imagePullSecrets). Le triplet est ecrit a partir du Deployment, qu'il existe ou
+non un Secret de ce nom. ATTENTION : a cause de la portee, un raisonneur deduira
+"rdf:type :Secret" pour la cible meme si le Secret n'existe pas. La regle S2 doit
+donc tester l'absence de :uid (fait que seul le greffier ecrit quand il VOIT le
+Secret), jamais l'absence du type."""@fr ;
+    :k8sSource "Deployment.spec.template.spec.{volumes[].secret.secretName, containers[].env[].valueFrom.secretKeyRef.name, containers[].envFrom[].secretRef.name, imagePullSecrets[].name}" ;
+    :usedInScenario "S2" ;
+    :writtenBy "greffier" .
+
+:affects a owl:ObjectProperty ;
+    rdfs:label "concerne"@fr ;
+    rdfs:domain :Drift ;
+    rdfs:range :KubernetesResource ;
+    rdfs:comment "Ressource(s) concernee(s) par une derive. Ecrit uniquement par les regles."@fr ;
+    :usedInScenario "S0" , "S1" , "S2" ;
+    :writtenBy "juge" .
+
+# =============================================================================
+# 4. DATA PROPERTIES
+# =============================================================================
+
+# --- identite et fraicheur (tout objet) --------------------------------------
+:clusterName a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "nom du cluster"@fr ;
+    rdfs:domain :KubernetesResource ;
+    rdfs:range xsd:string ;
+    rdfs:comment """Cluster ou se trouve l'objet (premier segment de l'IRI). Permet de filtrer
+par cluster sans decouper les IRI. La classe Cluster viendra avec la couche Cluster API."""@fr ;
+    :k8sSource "contexte du greffier (nom du Cluster CAPI)" ;
+    :usedInScenario "S0" , "S1" , "S2" ;
+    :writtenBy "greffier" .
+
+:resourceName a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "nom"@fr ;
+    rdfs:domain :KubernetesResource ;
+    rdfs:range xsd:string ;
+    rdfs:comment "metadata.name, recopie pour les requetes et l'affichage."@fr ;
+    :k8sSource "metadata.name" ;
+    :usedInScenario "S0" , "S1" , "S2" ;
+    :writtenBy "greffier" .
+
+:uid a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "uid"@fr ;
+    rdfs:domain :KubernetesResource ;
+    rdfs:range xsd:string ;
+    rdfs:comment """metadata.uid. N'est PAS l'identifiant de l'individu (Git ne connait pas l'uid).
+Sa presence signifie : "cet objet a ete vu dans le cluster". Son absence sur un
+objet reference est le signal de S2. Un uid qui change a nom egal revele un objet
+supprime puis recree."""@fr ;
+    :k8sSource "metadata.uid" ;
+    :usedInScenario "S2" ;
+    :writtenBy "greffier" .
+
+:observedAt a owl:DatatypeProperty ;
+    rdfs:label "observe a"@fr ;
+    rdfs:domain :KubernetesResource ;
+    rdfs:range xsd:dateTime ;
+    rdfs:comment "Instant ou le greffier a observe l'objet. Sert au verdict date (age de l'information)."@fr ;
+    :usedInScenario "S0" , "S1" , "S2" ;
+    :writtenBy "greffier" .
+
+:desiredRevision a owl:DatatypeProperty ;
+    rdfs:label "revision Git du desire"@fr ;
+    rdfs:domain :KubernetesResource ;
+    rdfs:range xsd:string ;
+    rdfs:comment """Revision du GitRepository Flux d'ou viennent les valeurs desirees, par exemple
+"test@sha1:39f14ded…". Tracabilite : la derive pointe vers un commit precis."""@fr ;
+    :k8sSource "GitRepository.status.artifact.revision" ;
+    :usedInScenario "S0" , "S1" ;
+    :writtenBy "greffier" .
+
+# --- replicas : trois valeurs sur le meme individu (Option C etendue) ---------
+:desiredReplicas a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "replicas desires (Git)"@fr ;
+    rdfs:domain :Deployment ;
+    rdfs:range xsd:integer ;
+    rdfs:comment """Valeur 1 sur 3 : spec.replicas tel qu'ecrit dans Git, a la revision
+:desiredRevision (1 si le champ est absent, comme le fait Kubernetes). S0."""@fr ;
+    :k8sSource "Git : Deployment.spec.replicas" ;
+    :usedInScenario "S0" ;
+    :writtenBy "greffier" .
+
+:observedSpecReplicas a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "replicas demandes dans le cluster (spec observee)"@fr ;
+    rdfs:domain :Deployment ;
+    rdfs:range xsd:integer ;
+    rdfs:comment """Valeur 2 sur 3 : spec.replicas tel qu'il est dans le cluster. Different de
+:desiredReplicas => la spec a ete modifiee hors Git (SpecDrift, S0 cas A)."""@fr ;
+    :k8sSource "Deployment.spec.replicas" ;
+    :usedInScenario "S0" ;
+    :writtenBy "greffier" .
+
+:actualReplicas a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "replicas reellement prets (status observe)"@fr ;
+    rdfs:domain :Deployment ;
+    rdfs:range xsd:integer ;
+    rdfs:comment """Valeur 3 sur 3 : nombre de pods PRETS, status.readyReplicas (0 si absent).
+Different de :observedSpecReplicas => Kubernetes n'a pas converge (ConvergenceDrift,
+S0 cas B). Changement par rapport a v0, qui lisait status.replicas : ce compteur
+inclut les pods Pending et masquerait une non-convergence."""@fr ;
+    :k8sSource "Deployment.status.readyReplicas" ;
+    :usedInScenario "S0" ;
+    :writtenBy "greffier" .
+
+# --- Pod ----------------------------------------------------------------------
+:podPhase a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "phase du pod"@fr ;
+    rdfs:domain :Pod ;
+    rdfs:range xsd:string ;
+    rdfs:comment """Pending, Running, Succeeded, Failed ou Unknown. Aide a expliquer une
+ConvergenceDrift (pods Pending) et a ignorer les pods termines en S1."""@fr ;
+    :k8sSource "Pod.status.phase" ;
+    :usedInScenario "S0" , "S1" ;
+    :writtenBy "greffier" .
+
+# --- Label --------------------------------------------------------------------
+:hasKey a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "cle"@fr ;
+    rdfs:domain :Label ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Cle du label, par exemple \"kubernetes.io/os\" ou \"sylvatwin.orange.com/zone\". S1."@fr ;
+    :usedInScenario "S1" ;
+    :writtenBy "greffier" .
+
+:hasValue a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "valeur"@fr ;
+    rdfs:domain :Label ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Valeur du label (chaine vide autorisee, ex. node-role.kubernetes.io/control-plane). S1."@fr ;
+    :usedInScenario "S1" ;
+    :writtenBy "greffier" .
+
+# --- Drift --------------------------------------------------------------------
+:detectedAt a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "detecte a"@fr ;
+    rdfs:domain :Drift ;
+    rdfs:range xsd:dateTime ;
+    rdfs:comment "Instant ou la regle a constate la derive. Ecrit uniquement par les regles."@fr ;
+    :usedInScenario "S0" , "S1" , "S2" ;
+    :writtenBy "juge" .
