@@ -1,0 +1,20 @@
+# JUGE — S6 : MachineNodeMismatchDrift (memes cas que CQ9).
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+CONSTRUCT {
+  ?drift a :MachineNodeMismatchDrift ; :affects ?obj ; :detectedAt ?now .
+} WHERE {
+  {
+    ?obj a :Machine ; :machineOfCluster ?cluster .
+    OPTIONAL { ?obj :machinePhase ?phase }
+    FILTER (!BOUND(?phase) || ?phase NOT IN ("Pending", "Provisioning", "Deleting"))
+    OPTIONAL { ?obj :machineHasNode ?n }
+    FILTER ( !BOUND(?n) || NOT EXISTS { ?n :uid ?u } )
+  } UNION {
+    ?kc :clusterDescribedBy ?cluster .
+    ?obj a :Node ; :resourceInCluster ?kc ; :uid ?u2 .
+    FILTER NOT EXISTS { ?m :machineOfCluster ?cluster ; :machineHasNode ?obj . }
+  }
+  BIND (NOW() AS ?now)
+  BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/MachineNodeMismatchDrift/", REPLACE(STR(?obj), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?drift)
+}

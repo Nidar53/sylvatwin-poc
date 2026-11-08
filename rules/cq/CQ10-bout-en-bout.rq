@@ -1,0 +1,20 @@
+# CQ10 — Chaine de bout en bout pour une NF : depot Git -> Kustomization ->
+# cluster cible -> Deployment -> ReplicaSet -> Pod -> Node -> Machine CAPI ->
+# Cluster CAPI. Repond a : "d'ou vient et ou tourne cette fonction reseau ?"
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT ?nf ?git ?branche ?kustomization ?revision ?cluster ?deployment ?pod ?node ?machine ?clusterCapi WHERE {
+  ?nf :realizedBy ?deployment .
+  OPTIONAL {
+    ?deployment :managedBy ?kustomization .
+    ?kustomization a :Kustomization ; :sourcedFrom ?repo .
+    OPTIONAL { ?kustomization :actualRevision ?revision }
+    ?repo :gitUrl ?git ; :gitBranch ?branche .
+  }
+  OPTIONAL { ?deployment :resourceInCluster ?cluster }
+  OPTIONAL {
+    ?pod a :Pod ; :ownedBy/:ownedBy ?deployment .
+    OPTIONAL { ?pod :runsOn ?node .
+               OPTIONAL { ?machine :machineHasNode ?node ; :machineOfCluster ?clusterCapi } }
+  }
+}

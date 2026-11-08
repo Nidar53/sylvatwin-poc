@@ -1,0 +1,18 @@
+# JUGE — S3, impact PAR DEPENDANCE. S'execute APRES 10. Si une NF est touchee
+# (quel que soit le chemin), les NF qui en dependent (:dependsOnNF+) le sont aussi.
+# Exemple : NRF touchee -> UDM, AMF, SMF, BSF... touchees par dependance.
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+CONSTRUCT {
+  ?impact a :FunctionImpactDrift ; :causedBy ?origine ; :affectsFunction ?nf ;
+          :impactPath "dependance" ; :detectedAt ?now .
+} WHERE {
+  ?direct a :FunctionImpactDrift ; :causedBy ?origine ; :affectsFunction ?nfTouchee .
+  FILTER NOT EXISTS { ?direct :impactPath "dependance" }
+  ?nf :dependsOnNF+ ?nfTouchee .
+  FILTER NOT EXISTS { ?autre a :FunctionImpactDrift ; :causedBy ?origine ; :affectsFunction ?nf ;
+                             :impactPath ?p . FILTER (?p != "dependance") }
+  BIND (NOW() AS ?now)
+  BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/FunctionImpactDrift/",
+        REPLACE(STR(?origine), "^https://w3id.org/sylvatwin/(res|drift)/", ""), "/", REPLACE(STR(?nf), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?impact)
+}

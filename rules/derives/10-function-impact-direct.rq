@@ -1,0 +1,41 @@
+# JUGE — S3 (inter-couches), impact DIRECT. S'execute APRES 01 a 08 (sur le
+# graphe enrichi de leurs derives). Pour chaque derive Kubernetes, Flux ou CAPI,
+# trouve la NF touchee et produit une :FunctionImpactDrift :causedBy cette derive.
+#   direct         : la derive concerne le Deployment de la NF, ou un de ses Pods
+#   flux           : la derive concerne la Kustomization qui gere ce Deployment
+#   infrastructure : derive Cluster API (S6) sur le Node, ou sur la Machine du
+#                    Node, ou tourne un Pod de la NF
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+CONSTRUCT {
+  ?impact a :FunctionImpactDrift ; :causedBy ?origine ; :affectsFunction ?nf ;
+          :impactPath ?chemin ; :detectedAt ?now .
+} WHERE {
+  ?origine a ?typeOrigine ; :affects ?res .
+  FILTER (?typeOrigine IN (:SpecDrift, :ConvergenceDrift, :PlacementDrift,
+                           :BrokenReferenceDrift, :GitOpsSyncDrift, :MachineNodeMismatchDrift))
+  # NB : chaque branche contient son propre triplet :realizedBy. En SPARQL, un
+  # FILTER seul dans un bloc d'UNION ne voit pas les variables du dehors.
+  {
+    ?nf :realizedBy ?res . BIND ("direct" AS ?chemin)
+  } UNION {
+    ?res a :Pod ; :ownedBy+ ?dep . ?nf :realizedBy ?dep . BIND ("direct" AS ?chemin)
+  } UNION {
+    ?res a :Kustomization . ?dep :managedBy ?res . ?nf :realizedBy ?dep . BIND ("flux" AS ?chemin)
+  } UNION {
+    # infrastructure : seulement pour une derive Cluster API. Une PlacementDrift
+    # concerne aussi le Node, mais elle ne touche que la NF qui exige le label
+    # (deja trouvee par la branche Pod) : sans ce filtre, toutes les NF du noeud
+    # seraient marquees a tort (faux positif constate en verification).
+    ?origine a :MachineNodeMismatchDrift .
+    ?res a :Node . ?pod a :Pod ; :runsOn ?res ; :ownedBy+ ?dep . ?nf :realizedBy ?dep .
+    BIND ("infrastructure" AS ?chemin)
+  } UNION {
+    ?origine a :MachineNodeMismatchDrift .
+    ?res :machineHasNode ?node . ?pod a :Pod ; :runsOn ?node ; :ownedBy+ ?dep . ?nf :realizedBy ?dep .
+    BIND ("infrastructure" AS ?chemin)
+  }
+  BIND (NOW() AS ?now)
+  BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/FunctionImpactDrift/",
+        REPLACE(STR(?origine), "^https://w3id.org/sylvatwin/(res|drift)/", ""), "/", REPLACE(STR(?nf), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?impact)
+}

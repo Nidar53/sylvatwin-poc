@@ -1,0 +1,10 @@
+# CQ3 — De quel Deployment depend un Pod (via son ReplicaSet), et sur quel Node
+# tourne-t-il ? Chaine reconstituee UNIQUEMENT par les ownerReferences.
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT ?pod ?replicaSet ?deployment ?node WHERE {
+  ?pod a :Pod ; :ownedBy ?replicaSet .
+  ?replicaSet a :ReplicaSet ; :ownedBy ?deployment .
+  ?deployment a :Deployment .
+  OPTIONAL { ?pod :runsOn ?node }
+}

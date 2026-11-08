@@ -1,0 +1,17 @@
+# CQ2 (S1) — Quels Pods tournent sur un Node qui ne porte pas un label exige
+# par le nodeSelector (declare dans Git) de leur Deployment ?
+# Lit : :ownedBy (Pod -> ReplicaSet -> Deployment, ownerReferences),
+#       :runsOn, :requiresNodeLabel, :hasLabel, :hasKey, :hasValue.
+# Compare la CLE et la VALEUR (jamais l'IRI du Label). Un Pod sans :runsOn
+# (Pending) n'est pas mal place : il n'est pas place.
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT ?pod ?deployment ?node ?key ?value WHERE {
+  ?pod a :Pod ; :runsOn ?node ; :ownedBy+ ?deployment .
+  ?deployment a :Deployment ; :requiresNodeLabel ?req .
+  ?req :hasKey ?key ; :hasValue ?value .
+  FILTER NOT EXISTS {
+    ?node :hasLabel ?l .
+    ?l :hasKey ?key ; :hasValue ?value .
+  }
+}

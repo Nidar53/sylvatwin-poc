@@ -1,0 +1,12 @@
+# JUGE — S0 cas B : ConvergenceDrift (spec conforme a Git, status different).
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+CONSTRUCT {
+  ?drift a :ConvergenceDrift ; :affects ?deployment ; :detectedAt ?now .
+} WHERE {
+  ?deployment a :Deployment ; :desiredReplicas ?git ;
+              :observedSpecReplicas ?spec ; :actualReplicas ?status .
+  FILTER (?git = ?spec && ?spec != ?status)
+  BIND (NOW() AS ?now)
+  BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/ConvergenceDrift/", REPLACE(STR(?deployment), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?drift)
+}

@@ -1,0 +1,19 @@
+# CQ6 (S4, inter-NF) — Les NF du meme namespace qui declarent un PLMN
+# declarent-elles le meme ? Liste les paires en desaccord.
+# Seules les NF qui DECLARENT un PLMN sont comparees (UDM n'en declare pas).
+# Lit : :hasPlmn, :mcc, :mnc, :realizedBy, :inNamespace.
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT ?nf1 ?plmn1 ?nf2 ?plmn2 WHERE {
+  ?nf1 :hasPlmn ?p1 ; :realizedBy/:inNamespace ?ns .
+  ?nf2 :hasPlmn ?p2 ; :realizedBy/:inNamespace ?ns .
+  ?p1 :mcc ?mcc1 ; :mnc ?mnc1 .
+  ?p2 :mcc ?mcc2 ; :mnc ?mnc2 .
+  FILTER (STR(?nf1) < STR(?nf2))
+  FILTER (?mcc1 != ?mcc2 || ?mnc1 != ?mnc2)
+  # une NF qui sert AUSSI le PLMN de l'autre n'est pas en desaccord
+  FILTER NOT EXISTS { ?nf1 :hasPlmn ?p2 }
+  FILTER NOT EXISTS { ?nf2 :hasPlmn ?p1 }
+  BIND (CONCAT(?mcc1, "/", ?mnc1) AS ?plmn1)
+  BIND (CONCAT(?mcc2, "/", ?mnc2) AS ?plmn2)
+}

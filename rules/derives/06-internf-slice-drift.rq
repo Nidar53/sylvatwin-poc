@@ -1,0 +1,15 @@
+# JUGE — S4 : InterNFConsistencyDrift sur les tranches (memes filtres que CQ7).
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+CONSTRUCT {
+  ?drift a :InterNFConsistencyDrift ; :affectsFunction ?smf ; :affects ?d ; :detectedAt ?now .
+} WHERE {
+  ?smf a :SMF ; :servesSlice ?slice ; :realizedBy ?d . ?d :inNamespace ?ns .
+  ?slice :sst ?sst .
+  FILTER NOT EXISTS {
+    ?amf a :AMF ; :realizedBy/:inNamespace ?ns ; :servesSlice ?s2 . ?s2 :sst ?sst .
+  }
+  BIND (NOW() AS ?now)
+  BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/InterNFConsistencyDrift/slice/",
+        REPLACE(STR(?smf), "^https://w3id.org/sylvatwin/(res|drift)/", ""), "/sst-", STR(?sst))) AS ?drift)
+}

@@ -1,0 +1,14 @@
+# CQ8 (S5) — Quelles Kustomizations n'appliquent pas la revision de leur source,
+# ou sont suspendues ? Combien d'objets gerent-elles, et dans quel cluster ?
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT ?kustomization ?desire ?applique ?suspendue ?cible (COUNT(DISTINCT ?obj) AS ?objetsGeres) WHERE {
+  ?kustomization a :Kustomization ; :targetsCluster ?cible .
+  OPTIONAL { ?kustomization :desiredRevision ?desire }
+  OPTIONAL { ?kustomization :actualRevision ?applique }
+  OPTIONAL { ?kustomization :suspended ?suspendue }
+  OPTIONAL { ?obj :managedBy ?kustomization }
+  FILTER ( (BOUND(?suspendue) && ?suspendue = true)
+        || (BOUND(?desire) && (!BOUND(?applique) || ?desire != ?applique)) )
+}
+GROUP BY ?kustomization ?desire ?applique ?suspendue ?cible

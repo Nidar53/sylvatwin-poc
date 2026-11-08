@@ -1,0 +1,11 @@
+# JUGE — S2 : BrokenReferenceDrift. Test sur l'absence de :uid (voir CQ4).
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+CONSTRUCT {
+  ?drift a :BrokenReferenceDrift ; :affects ?deployment , ?secret ; :detectedAt ?now .
+} WHERE {
+  ?deployment a :Deployment ; :referencesSecret ?secret .
+  FILTER NOT EXISTS { ?secret :uid ?u }
+  BIND (NOW() AS ?now)
+  BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/BrokenReferenceDrift/", REPLACE(STR(?secret), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?drift)
+}

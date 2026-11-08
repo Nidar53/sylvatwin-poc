@@ -1,0 +1,22 @@
+# CQ9 (S6) — Les Machines CAPI et les Nodes du cluster reel correspondent-ils ?
+#   type "machine-sans-node" : Machine hors creation sans :machineHasNode,
+#        ou dont le Node n'est plus observe (pas de :uid) ;
+#   type "node-sans-machine" : Node du cluster reel decrit par un Cluster CAPI,
+#        revendique par aucune Machine de ce Cluster.
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT ?type ?machine ?node ?cluster WHERE {
+  {
+    ?machine a :Machine ; :machineOfCluster ?cluster .
+    OPTIONAL { ?machine :machinePhase ?phase }
+    FILTER (!BOUND(?phase) || ?phase NOT IN ("Pending", "Provisioning", "Deleting"))
+    OPTIONAL { ?machine :machineHasNode ?node }
+    FILTER ( !BOUND(?node) || NOT EXISTS { ?node :uid ?u } )
+    BIND ("machine-sans-node" AS ?type)
+  } UNION {
+    ?kc :clusterDescribedBy ?cluster .
+    ?node a :Node ; :resourceInCluster ?kc ; :uid ?u2 .
+    FILTER NOT EXISTS { ?m :machineOfCluster ?cluster ; :machineHasNode ?node . }
+    BIND ("node-sans-machine" AS ?type)
+  }
+}

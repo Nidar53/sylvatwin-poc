@@ -1,0 +1,13 @@
+# JUGE — S0 cas A : SpecDrift (spec du cluster != Git).
+# Produit un individu :SpecDrift par Deployment concerne.
+# IRI stable : meme ressource => meme IRI de derive (comparable d'un cycle a l'autre).
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+CONSTRUCT {
+  ?drift a :SpecDrift ; :affects ?deployment ; :detectedAt ?now .
+} WHERE {
+  ?deployment a :Deployment ; :desiredReplicas ?git ; :observedSpecReplicas ?spec .
+  FILTER (?git != ?spec)
+  BIND (NOW() AS ?now)
+  BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/SpecDrift/", REPLACE(STR(?deployment), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?drift)
+}

@@ -1,0 +1,12 @@
+# CQ7 (S4, inter-NF) — Quelles tranches servies par un SMF ne sont servies par
+# aucun AMF du meme namespace ?
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT ?smf ?sst WHERE {
+  ?smf a :SMF ; :servesSlice ?slice ; :realizedBy/:inNamespace ?ns .
+  ?slice :sst ?sst .
+  FILTER NOT EXISTS {
+    ?amf a :AMF ; :realizedBy/:inNamespace ?ns ; :servesSlice ?s2 .
+    ?s2 :sst ?sst .
+  }
+}

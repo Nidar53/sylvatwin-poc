@@ -1,0 +1,14 @@
+# JUGE — S5 : GitOpsSyncDrift (revision non appliquee, ou suspension).
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+CONSTRUCT {
+  ?drift a :GitOpsSyncDrift ; :affects ?k ; :detectedAt ?now .
+} WHERE {
+  ?k a :Kustomization .
+  OPTIONAL { ?k :desiredRevision ?d }
+  OPTIONAL { ?k :actualRevision ?a }
+  OPTIONAL { ?k :suspended ?s }
+  FILTER ( (BOUND(?s) && ?s = true) || (BOUND(?d) && (!BOUND(?a) || ?d != ?a)) )
+  BIND (NOW() AS ?now)
+  BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/GitOpsSyncDrift/", REPLACE(STR(?k), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?drift)
+}

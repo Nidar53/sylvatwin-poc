@@ -6,7 +6,15 @@
 @prefix dcterms: <http://purl.org/dc/terms/> .
 
 # =============================================================================
-# SylvaTwin — ontologie MINIMALE (version A), v1.0.0
+# SylvaTwin — ontologie MINIMALE (version A), v1.1.0 : toutes les couches
+#
+#   L1 Cluster API   : KubernetesCluster, Cluster, Machine
+#   L2 Kubernetes    : Namespace, Deployment, ReplicaSet, Pod, Node, Secret, Label
+#   L3 GitOps Flux   : GitRepository, Kustomization, HelmRelease
+#   L4 Fonctions 5G  : NetworkFunction (+ sous-classes 3GPP), NetworkInterface, PLMN, Slice
+#   Transverse       : Drift (+ sous-classes), ecrit uniquement par le juge
+#
+# v1.0.0 -> v1.1.0 : ajouts seulement (aucun terme v1.0.0 retire ni redefini).
 #
 # Fichier NOUVEAU. Il ne remplace pas sylvatwin-slice-v0.ttl, garde pour
 # comparaison. Espace de noms DIFFERENT (…/core#) : les deux fichiers peuvent
@@ -17,6 +25,15 @@
 #   D1  IRI des individus : https://w3id.org/sylvatwin/res/<cluster>/<namespace>/<Kind>/<nom>
 #       objets sans namespace : segment fixe "_"  (ex. …/<cluster>/_/Node/<nom>)
 #       l'uid Kubernetes est une simple data property (:uid).
+#       D1-bis (v1.1.0, a valider) : pour les CRD, le segment <Kind> vaut
+#       <Kind>.<groupe> (ex. Cluster.cluster.x-k8s.io). Raison observee : dans le
+#       management, fleet-default/c-tfk7r existe a la fois en Cluster
+#       provisioning.cattle.io et en Cluster fleet.cattle.io. Natifs (core, apps) :
+#       <Kind> seul, inchange.
+#       Entites non Kubernetes : KubernetesCluster = .../res/<cluster> ;
+#       NetworkFunction = .../res/<cluster>/<ns>/NetworkFunction/<nom> ;
+#       NetworkInterface = <IRI de la NF>/interface/<nom> ;
+#       PLMN = .../res/_/PLMN/<mcc>-<mnc> ; Slice = .../res/_/Slice/sst-<sst>[-sd-<sd>].
 #   D2  ReplicaSet = classe a part entiere ; Pod -> ReplicaSet -> Deployment
 #       uniquement via metadata.ownerReferences (:ownedBy), jamais via le label app.
 #   D3  Replicas : TROIS valeurs sur le meme individu (Option C etendue)
@@ -31,18 +48,29 @@
 #     (SHACL/SPARQL). L'operateur n'ecrit jamais une classe Drift ni :affects.
 #
 # Scenarios : S0 = replicas (ConfigurationDrift), S1 = placement (PlacementDrift),
-#             S2 = reference a un Secret cassee (BrokenReferenceDrift).
+#             S2 = reference a un Secret cassee (BrokenReferenceDrift),
+#             S3 = impact inter-couches sur une NF (FunctionImpactDrift),
+#             S4 = incoherence entre NF : PLMN, tranche (InterNFConsistencyDrift),
+#             S5 = livraison GitOps bloquee (GitOpsSyncDrift),
+#             S6 = Machine CAPI <-> Node incoherents (MachineNodeMismatchDrift).
+# Regles : dossier rules/ (SPARQL). Ordre : rules/derives/0*.rq, puis 10-*.rq,
+# puis 11-*.rq (11 propage l'impact trouve par 10).
+#
+# LIMITE DU BANC (a citer dans la these) : pas d'UPF, pas de gNB, pas d'UE, donc
+# aucun trafic ; NGAP (N2), PFCP (N4) et GTP-U sont lies a 127.0.0.1 et
+# injoignables hors de leur pod. La couche L4 modelise la configuration et les
+# dependances declarees, pas un service 5G en fonctionnement.
 # =============================================================================
 
 <https://w3id.org/sylvatwin/core> a owl:Ontology ;
-    owl:versionIRI <https://w3id.org/sylvatwin/core/1.0.0> ;
-    owl:versionInfo "1.0.0" ;
-    dcterms:title "SylvaTwin — ontologie minimale (version A) : Kubernetes natif, scenarios S0, S1, S2"@fr ;
+    owl:versionIRI <https://w3id.org/sylvatwin/core/1.1.0> ;
+    owl:versionInfo "1.1.0" ;
+    dcterms:title "SylvaTwin — ontologie minimale (version A) : Cluster API, Kubernetes, Flux, fonctions 5G"@fr ;
     dcterms:creator "Ahmed Nidhar Sebihi" ;
     dcterms:created "2026-11-08"^^xsd:date ;
-    rdfs:comment """Version minimale pour comprendre : 8 classes du domaine Kubernetes et 6 classes
-de derive. Les couches Flux, Cluster API et fonctions reseau viendront dans la
-version complete (B), qui prolongera ces classes sans les modifier."""@fr ;
+    rdfs:comment """Version minimale de bout en bout : le minimum de chaque couche (L1 Cluster API,
+L2 Kubernetes, L3 Flux, L4 fonctions reseau) pour que les ponts entre couches
+existent. La version complete (B) prolongera ces classes sans les modifier."""@fr ;
     rdfs:seeAlso <https://w3id.org/sylvatwin/k8s> .
 
 # -----------------------------------------------------------------------------
@@ -54,7 +82,11 @@ dcterms:created a owl:AnnotationProperty .
 
 :usedInScenario a owl:AnnotationProperty ;
     rdfs:label "utilise dans le scenario"@fr ;
-    rdfs:comment "Scenario(s) de derive qui ont besoin de ce terme : S0, S1 ou S2."@fr .
+    rdfs:comment "Scenario(s) de derive qui ont besoin de ce terme : S0 a S6 (voir l'en-tete)."@fr .
+
+:layer a owl:AnnotationProperty ;
+    rdfs:label "couche"@fr ;
+    rdfs:comment "Couche du jumeau : L1 (Cluster API), L2 (Kubernetes), L3 (Flux), L4 (fonctions reseau) ou transverse."@fr .
 
 :writtenBy a owl:AnnotationProperty ;
     rdfs:label "ecrit par"@fr ;
@@ -325,10 +357,13 @@ supprime puis recree."""@fr ;
     rdfs:label "revision Git du desire"@fr ;
     rdfs:domain :KubernetesResource ;
     rdfs:range xsd:string ;
-    rdfs:comment """Revision du GitRepository Flux d'ou viennent les valeurs desirees, par exemple
-"test@sha1:39f14ded…". Tracabilite : la derive pointe vers un commit precis."""@fr ;
-    :k8sSource "GitRepository.status.artifact.revision" ;
-    :usedInScenario "S0" , "S1" ;
+    rdfs:comment """Revision Git desiree. Sur un objet deploye (Deployment) : revision du GitRepository
+d'ou viennent ses valeurs desirees, par exemple "test@sha1:39f14ded…". Sur une
+Kustomization : revision de sa source (moitie "desire" de la paire Option C avec
+:actualRevision, S5). Sur une HelmRelease : revision de l'artefact de chart.
+Tracabilite : la derive pointe vers un commit precis."""@fr ;
+    :k8sSource "GitRepository.status.artifact.revision (Kustomization, Deployment) ; HelmChart.status.artifact.revision (HelmRelease)" ;
+    :usedInScenario "S0" , "S1" , "S5" ;
     :writtenBy "greffier" .
 
 # --- replicas : trois valeurs sur le meme individu (Option C etendue) ---------
@@ -400,3 +435,531 @@ ConvergenceDrift (pods Pending) et a ignorer les pods termines en S1."""@fr ;
     rdfs:comment "Instant ou la regle a constate la derive. Ecrit uniquement par les regles."@fr ;
     :usedInScenario "S0" , "S1" , "S2" ;
     :writtenBy "juge" .
+
+# #############################################################################
+# v1.1.0 — COUCHES L1 (Cluster API), L3 (Flux), L4 (fonctions reseau)
+# Les classes et proprietes ci-dessus (v1.0.0) forment la couche L2 et restent
+# inchangees. Tout ce qui suit est un AJOUT.
+# #############################################################################
+
+# =============================================================================
+# 5. FAMILLE "CRD" : classe parente
+# =============================================================================
+
+:CustomResource a owl:Class ; rdfs:subClassOf :KubernetesResource ;
+    rdfs:label "ressource personnalisee (CRD)"@fr , "Custom resource"@en ;
+    rdfs:comment """Parent des objets definis par une CRD (Cluster API, Flux). Ce sont bien des objets
+Kubernetes (ils ont un uid, un namespace, et vivent dans un cluster), mais ils
+decrivent ou pilotent d'autres objets. Les separer des ressources natives rend
+explicites les ponts entre les deux familles (:machineHasNode, :managedBy…).
+Disjointe des classes natives."""@fr ;
+    :layer "L1" , "L3" ;
+    :usedInScenario "S5" , "S6" ;
+    :writtenBy "greffier" .
+
+[] a owl:AllDisjointClasses ;
+    owl:members ( :CustomResource :Namespace :Deployment :ReplicaSet :Pod :Node :Secret ) .
+
+:apiGroup a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "groupe d'API"@fr ;
+    rdfs:domain :CustomResource ;
+    rdfs:range xsd:string ;
+    rdfs:comment """Groupe d'API de la CRD (cluster.x-k8s.io, kustomize.toolkit.fluxcd.io…). Lève
+l'ambiguite entre CRD de meme Kind (sur ton management, 5 groupes definissent un
+Kind "Cluster"). C'est aussi le suffixe du segment <Kind> de l'IRI (D1-bis)."""@fr ;
+    :k8sSource "apiVersion (partie groupe)" ;
+    :layer "L1" , "L3" ;
+    :usedInScenario "S5" , "S6" ;
+    :writtenBy "greffier" .
+
+# =============================================================================
+# 6. L1 — CLUSTER API (minimal)
+# =============================================================================
+
+:KubernetesCluster a owl:Class ;
+    rdfs:label "cluster Kubernetes (reel)"@fr , "Kubernetes cluster"@en ;
+    rdfs:comment """Le cluster REEL, tel qu'on l'observe par son API (ici : management-cluster et
+my-workload-kubeadm-capd). Ce n'est pas un objet Kubernetes : c'est le conteneur
+de tous les objets observes. IRI : .../res/<cluster>. Il fait le pont entre la
+description CAPI (:clusterDescribedBy) et les objets qu'il contient
+(:resourceInCluster), et sert de cible aux Kustomizations (:targetsCluster).
+Ne JAMAIS lui donner :clusterName, :uid ou :observedAt : leur domaine est
+KubernetesResource, et un raisonneur en conclurait que le cluster est une ressource
+(incoherence avec la disjonction). Son nom est dans l'IRI et rdfs:label."""@fr ;
+    owl:disjointWith :KubernetesResource ;
+    :layer "L1" ;
+    :usedInScenario "S5" , "S6" ;
+    :writtenBy "greffier" .
+
+:Cluster a owl:Class ; rdfs:subClassOf :CustomResource ;
+    rdfs:label "Cluster (objet Cluster API)"@fr , "Cluster API Cluster"@en ;
+    rdfs:comment """L'objet Cluster de Cluster API (cluster.x-k8s.io), qui vit dans le cluster de
+MANAGEMENT et DECRIT un cluster (souvent un autre : le workload). Ne pas confondre
+avec :KubernetesCluster, le cluster reel. Dans Sylva, il est lui-meme produit par
+une HelmRelease Flux ("cluster"), d'ou la chaine Git -> Flux -> CAPI."""@fr ;
+    :k8sSource "clusters.cluster.x-k8s.io" ;
+    :layer "L1" ;
+    :usedInScenario "S6" ;
+    :writtenBy "greffier" .
+
+:Machine a owl:Class ; rdfs:subClassOf :CustomResource ;
+    rdfs:label "Machine (Cluster API)"@fr , "Machine"@en ;
+    rdfs:comment """Une machine declaree par Cluster API (ici : un conteneur CAPD). Elle vit dans le
+cluster de management ; le Node qu'elle devient vit dans le cluster decrit. C'est
+le pont L1 -> L2 (:machineHasNode). S6 compare ces deux mondes."""@fr ;
+    :k8sSource "machines.cluster.x-k8s.io" ;
+    :layer "L1" ;
+    :usedInScenario "S6" ;
+    :writtenBy "greffier" .
+
+[] a owl:AllDisjointClasses ;
+    owl:members ( :Cluster :Machine :GitRepository :Kustomization :HelmRelease ) .
+
+:resourceInCluster a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:label "se trouve dans le cluster"@fr ;
+    rdfs:domain :KubernetesResource ;
+    rdfs:range :KubernetesCluster ;
+    rdfs:comment """Cluster reel ou l'objet a ete observe. Version objet de :clusterName : elle
+permet de traverser les couches (Pod -> cluster -> Cluster CAPI -> Machines…).
+Exemple : la Machine est dans le management, son Node est dans le workload."""@fr ;
+    :k8sSource "contexte du greffier (kubeconfig utilise pour l'observation)" ;
+    :layer "L1" , "L2" ;
+    :usedInScenario "S5" , "S6" ;
+    :writtenBy "greffier" .
+
+:clusterDescribedBy a owl:ObjectProperty ;
+    rdfs:label "est decrit par"@fr ;
+    rdfs:domain :KubernetesCluster ;
+    rdfs:range :Cluster ;
+    rdfs:comment """Le cluster reel est decrit par cet objet Cluster API. Le greffier l'ecrit
+quand l'endpoint de l'API observee correspond a Cluster.spec.controlPlaneEndpoint
+(ici 172.30.0.2:6443 pour le workload)."""@fr ;
+    :k8sSource "Cluster.spec.controlPlaneEndpoint = serveur du kubeconfig" ;
+    :layer "L1" ;
+    :usedInScenario "S6" ;
+    :writtenBy "greffier" .
+
+:machineOfCluster a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:label "machine du Cluster"@fr ;
+    rdfs:domain :Machine ;
+    rdfs:range :Cluster ;
+    rdfs:comment """Le Cluster CAPI auquel appartient la Machine. Indispensable pour S6 : on
+compare les Machines d'un Cluster aux Nodes du cluster reel qu'il decrit."""@fr ;
+    :k8sSource "Machine.spec.clusterName (label cluster.x-k8s.io/cluster-name)" ;
+    :layer "L1" ;
+    :usedInScenario "S6" ;
+    :writtenBy "greffier" .
+
+:machineHasNode a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:label "a pour noeud"@fr ;
+    rdfs:domain :Machine ;
+    rdfs:range :Node ;
+    rdfs:comment """Pont L1 -> L2 : le Node que la Machine est devenue. Le greffier ne l'ecrit que
+si Machine.status.nodeRef existe. Une Machine sans ce triplet, ou un Node
+qu'aucune Machine ne revendique, est le signal de S6."""@fr ;
+    :k8sSource "Machine.status.nodeRef.name" ;
+    :layer "L1" ;
+    :usedInScenario "S6" ;
+    :writtenBy "greffier" .
+
+:machinePhase a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "phase de la machine"@fr ;
+    rdfs:domain :Machine ;
+    rdfs:range xsd:string ;
+    rdfs:comment """Pending, Provisioning, Provisioned, Running, Deleting, Failed… Permet a S6
+d'ignorer une Machine encore en creation (pas de Node, c'est normal)."""@fr ;
+    :k8sSource "Machine.status.phase" ;
+    :layer "L1" ;
+    :usedInScenario "S6" ;
+    :writtenBy "greffier" .
+
+# =============================================================================
+# 7. L3 — GITOPS FLUX (minimal)
+# =============================================================================
+
+:GitRepository a owl:Class ; rdfs:subClassOf :CustomResource ;
+    rdfs:label "GitRepository (source Flux)"@fr , "GitRepository"@en ;
+    rdfs:comment """La source Git surveillee par Flux. Porte l'URL, la branche et la derniere
+revision recuperee : c'est la reference "desiree" de toute la chaine."""@fr ;
+    :k8sSource "gitrepositories.source.toolkit.fluxcd.io" ;
+    :layer "L3" ;
+    :usedInScenario "S5" ;
+    :writtenBy "greffier" .
+
+:Kustomization a owl:Class ; rdfs:subClassOf :CustomResource ;
+    rdfs:label "Kustomization (Flux)"@fr , "Flux Kustomization"@en ;
+    rdfs:comment """Ce que Flux applique depuis une source vers un cluster (a ne pas confondre
+avec le fichier kustomization.yaml). Ici : sylvatwin-5gc, sur le management, qui
+deploie le coeur 5G dans le workload. Porte la paire Option C
+desiredRevision / actualRevision et l'etat suspended (S5)."""@fr ;
+    :k8sSource "kustomizations.kustomize.toolkit.fluxcd.io" ;
+    :layer "L3" ;
+    :usedInScenario "S5" ;
+    :writtenBy "greffier" .
+
+:HelmRelease a owl:Class ; rdfs:subClassOf :CustomResource ;
+    rdfs:label "HelmRelease (Flux)"@fr , "HelmRelease"@en ;
+    rdfs:comment """Un chart Helm installe par Flux. Existe reellement : 57 HelmReleases sur le
+management, dont "cluster" (namespace my-workload-kubeadm-capd) qui produit le
+Cluster CAPI du workload ; c'est le lien Flux -> Cluster API. Aucune HelmRelease
+pour le coeur 5G (il passe par une Kustomization)."""@fr ;
+    :k8sSource "helmreleases.helm.toolkit.fluxcd.io" ;
+    :layer "L3" ;
+    :usedInScenario "S5" ;
+    :writtenBy "greffier" .
+
+:managedBy a owl:ObjectProperty ;
+    rdfs:label "gere par"@fr ;
+    rdfs:domain :KubernetesResource ;
+    rdfs:range :CustomResource ;
+    rdfs:comment """L'objet a ete cree par cette Kustomization ou HelmRelease. Source principale :
+l'inventaire (Kustomization.status.inventory) ; a defaut, les labels poses par
+Flux. Pont L3 -> L2 (Deployment udm) et L3 -> L1 (Cluster gere par la HelmRelease
+"cluster"). Son ABSENCE sur un objet (udm-keys) dit "hors Git" : utile pour
+expliquer S2. Portee volontairement large (CustomResource) : OWL ne sait pas
+dire "Kustomization OU HelmRelease" en profil RL ; le controle est dans les regles."""@fr ;
+    :k8sSource "Kustomization.status.inventory.entries[].id ; labels kustomize.toolkit.fluxcd.io/name, helm.toolkit.fluxcd.io/name" ;
+    :layer "L3" ;
+    :usedInScenario "S2" , "S5" ;
+    :writtenBy "greffier" .
+
+:sourcedFrom a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:label "a pour source"@fr ;
+    rdfs:domain :Kustomization ;
+    rdfs:range :GitRepository ;
+    rdfs:comment """La Kustomization lit ses manifestes dans ce GitRepository. En version minimale,
+seule une source GitRepository est modelisee (cas de sylvatwin-5gc)."""@fr ;
+    :k8sSource "Kustomization.spec.sourceRef (kind GitRepository)" ;
+    :layer "L3" ;
+    :usedInScenario "S5" ;
+    :writtenBy "greffier" .
+
+:targetsCluster a owl:ObjectProperty ;
+    rdfs:label "cible le cluster"@fr ;
+    rdfs:domain :CustomResource ;
+    rdfs:range :KubernetesCluster ;
+    rdfs:comment """Cluster ou la Kustomization (ou la HelmRelease) applique ses objets : le cluster
+local si spec.kubeConfig est vide, sinon celui du kubeconfig reference. Ici,
+sylvatwin-5gc vit dans le management et cible le workload : c'est ce lien qui
+permet de remonter de Flux jusqu'aux Pods d'un autre cluster."""@fr ;
+    :k8sSource "spec.kubeConfig.secretRef -> serveur du kubeconfig (sinon cluster local)" ;
+    :layer "L3" ;
+    :usedInScenario "S5" ;
+    :writtenBy "greffier" .
+
+:actualRevision a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "revision Git reellement appliquee"@fr ;
+    rdfs:domain :CustomResource ;
+    rdfs:range xsd:string ;
+    rdfs:comment """Moitie "observee" de la paire Option C (avec :desiredRevision) : revision que
+Flux a effectivement appliquee. Different de :desiredRevision => la livraison
+GitOps est bloquee ou en retard (S5). Absent tant que rien n'a ete applique."""@fr ;
+    :k8sSource "Kustomization.status.lastAppliedRevision ; HelmRelease.status.history[0] (chartVersion)" ;
+    :layer "L3" ;
+    :usedInScenario "S5" ;
+    :writtenBy "greffier" .
+
+:suspended a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "suspendu"@fr ;
+    rdfs:domain :CustomResource ;
+    rdfs:range xsd:boolean ;
+    rdfs:comment """Vrai si la reconciliation Flux est suspendue (spec.suspend). Une Kustomization
+suspendue ne corrige plus rien : les derives S0 (cas A) ne sont plus reparees.
+Le greffier ecrit false si le champ est absent."""@fr ;
+    :k8sSource "spec.suspend" ;
+    :layer "L3" ;
+    :usedInScenario "S5" ;
+    :writtenBy "greffier" .
+
+:ready a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "pret"@fr ;
+    rdfs:domain :CustomResource ;
+    rdfs:range xsd:boolean ;
+    rdfs:comment """Condition Ready de l'objet Flux ou CAPI. Fait brut recopie, pas un jugement :
+c'est le controleur Flux qui l'a ecrite."""@fr ;
+    :k8sSource "status.conditions[type=Ready].status" ;
+    :layer "L3" ;
+    :usedInScenario "S5" ;
+    :writtenBy "greffier" .
+
+:gitUrl a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "URL Git"@fr ;
+    rdfs:domain :GitRepository ;
+    rdfs:range xsd:anyURI ;
+    rdfs:comment "URL du depot surveille."@fr ;
+    :k8sSource "GitRepository.spec.url" ;
+    :layer "L3" ;
+    :usedInScenario "S5" ;
+    :writtenBy "greffier" .
+
+:gitBranch a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "branche Git"@fr ;
+    rdfs:domain :GitRepository ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Branche suivie (spec.ref.branch)."@fr ;
+    :k8sSource "GitRepository.spec.ref.branch" ;
+    :layer "L3" ;
+    :usedInScenario "S5" ;
+    :writtenBy "greffier" .
+
+# =============================================================================
+# 8. L4 — FONCTIONS RESEAU (version legere, sans N2/N3/N4 fins)
+# =============================================================================
+
+:NetworkFunction a owl:Class ;
+    rdfs:label "fonction reseau (NF)"@fr , "Network function"@en ;
+    rdfs:comment """Une fonction du coeur 5G (3GPP TS 23.501), vue comme entite logique, distincte
+du Deployment qui la realise. C'est elle que l'operateur telecom regarde : une
+derive Kubernetes n'a de sens metier que si on sait QUELLE NF elle touche (S3).
+Le greffier l'ecrit a partir du label sylvatwin.orange.com/nf du Deployment et
+lit sa configuration (PLMN, tranches, NRF) dans la ConfigMap montee.
+LIMITE : le banc n'a ni UPF ni gNB ni UE, donc aucun trafic."""@fr ;
+    owl:disjointWith :KubernetesResource , :KubernetesCluster ;
+    :layer "L4" ;
+    :usedInScenario "S3" , "S4" ;
+    :writtenBy "greffier" .
+
+:AMF  a owl:Class ; rdfs:subClassOf :NetworkFunction ; rdfs:label "AMF"@fr ;
+    rdfs:comment "Access and Mobility Management Function. Deployee (NGAP lie a 127.0.0.1). Declare PLMN et tranches servis : sert S4."@fr ;
+    :layer "L4" ; :usedInScenario "S4" ; :writtenBy "greffier" .
+:SMF  a owl:Class ; rdfs:subClassOf :NetworkFunction ; rdfs:label "SMF"@fr ;
+    rdfs:comment "Session Management Function. Deployee (PFCP et GTP-U lies a 127.0.0.1, aucun UPF associe). Declare PLMN et tranches : sert S4."@fr ;
+    :layer "L4" ; :usedInScenario "S4" ; :writtenBy "greffier" .
+:UPF  a owl:Class ; rdfs:subClassOf :NetworkFunction ; rdfs:label "UPF"@fr ;
+    rdfs:comment "User Plane Function. NON DEPLOYEE sur le banc (besoin de NET_ADMIN et /dev/net/tun). Classe presente pour la completude 3GPP, aucun individu."@fr ;
+    :layer "L4" ; :usedInScenario "S3" ; :writtenBy "greffier" .
+:NRF  a owl:Class ; rdfs:subClassOf :NetworkFunction ; rdfs:label "NRF"@fr ;
+    rdfs:comment "Network Repository Function : annuaire ou toutes les NF s'enregistrent. Toutes en dependent (:dependsOnNF) : une NRF touchee touche tout le coeur (S3)."@fr ;
+    :layer "L4" ; :usedInScenario "S3" , "S4" ; :writtenBy "greffier" .
+:AUSF a owl:Class ; rdfs:subClassOf :NetworkFunction ; rdfs:label "AUSF"@fr ;
+    rdfs:comment "Authentication Server Function. Deployee."@fr ;
+    :layer "L4" ; :usedInScenario "S3" ; :writtenBy "greffier" .
+:UDM  a owl:Class ; rdfs:subClassOf :NetworkFunction ; rdfs:label "UDM"@fr ;
+    rdfs:comment "Unified Data Management. Deployee ; depend du Secret udm-keys (cles SUCI, hors Git) : c'est la NF touchee par S2 -> S3."@fr ;
+    :layer "L4" ; :usedInScenario "S3" ; :writtenBy "greffier" .
+:UDR  a owl:Class ; rdfs:subClassOf :NetworkFunction ; rdfs:label "UDR"@fr ;
+    rdfs:comment "Unified Data Repository. Deployee (base MongoDB)."@fr ;
+    :layer "L4" ; :usedInScenario "S3" ; :writtenBy "greffier" .
+:PCF  a owl:Class ; rdfs:subClassOf :NetworkFunction ; rdfs:label "PCF"@fr ;
+    rdfs:comment "Policy Control Function. Deployee (base MongoDB)."@fr ;
+    :layer "L4" ; :usedInScenario "S3" ; :writtenBy "greffier" .
+:NSSF a owl:Class ; rdfs:subClassOf :NetworkFunction ; rdfs:label "NSSF"@fr ;
+    rdfs:comment "Network Slice Selection Function. Deployee."@fr ;
+    :layer "L4" ; :usedInScenario "S3" ; :writtenBy "greffier" .
+:BSF  a owl:Class ; rdfs:subClassOf :NetworkFunction ; rdfs:label "BSF"@fr ;
+    rdfs:comment "Binding Support Function. Deployee ; cible proposee pour S1 (nodeSelector ajoute par toi dans bsf.yaml)."@fr ;
+    :layer "L4" ; :usedInScenario "S1" , "S3" ; :writtenBy "greffier" .
+
+[] a owl:AllDisjointClasses ;
+    owl:members ( :AMF :SMF :UPF :NRF :AUSF :UDM :UDR :PCF :NSSF :BSF ) .
+
+:NetworkInterface a owl:Class ;
+    rdfs:label "interface reseau d'une NF"@fr , "Network interface"@en ;
+    rdfs:comment """Un point d'acces expose par une NF, reduit a trois faits : nom (SBI, N2, N4…),
+port et protocole. Pas de modelisation fine des procedures N2/N3/N4. Sert a
+relier une NF a ce que Kubernetes expose ou filtre (Service, NetworkPolicy) dans
+la version complete. IRI : <IRI de la NF>/interface/<nom>."""@fr ;
+    owl:disjointWith :KubernetesResource , :NetworkFunction ;
+    :layer "L4" ;
+    :usedInScenario "S3" ;
+    :writtenBy "greffier" .
+
+:PLMN a owl:Class ;
+    rdfs:label "PLMN"@fr , "Public Land Mobile Network"@en ;
+    rdfs:comment """Identifiant d'un reseau mobile (MCC + MNC). Ici 999/70, code de test. Un seul
+individu par couple (IRI .../res/_/PLMN/999-70) : deux NF du meme reseau
+pointent vers le meme individu, deux PLMN differents se voient tout de suite (S4)."""@fr ;
+    owl:disjointWith :KubernetesResource , :NetworkFunction , :NetworkInterface ;
+    :layer "L4" ;
+    :usedInScenario "S4" ;
+    :writtenBy "greffier" .
+
+:Slice a owl:Class ;
+    rdfs:label "tranche de reseau (S-NSSAI)"@fr , "Network slice"@en ;
+    rdfs:comment """Tranche de reseau identifiee par son S-NSSAI (SST, et SD optionnel). Ici SST 1.
+Sert S4 : une tranche servie par le SMF doit aussi l'etre par l'AMF."""@fr ;
+    owl:disjointWith :KubernetesResource , :NetworkFunction , :NetworkInterface , :PLMN ;
+    :layer "L4" ;
+    :usedInScenario "S4" ;
+    :writtenBy "greffier" .
+
+:realizedBy a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:label "realisee par"@fr ;
+    rdfs:domain :NetworkFunction ;
+    rdfs:range :Deployment ;
+    rdfs:comment """Pont L4 -> L2 : le Deployment qui fait tourner la NF. Tire du label
+sylvatwin.orange.com/nf pose dans Git (pas d'heuristique sur le nom). C'est par
+ce lien qu'une derive Kubernetes (S0, S1, S2) remonte jusqu'a la NF (S3)."""@fr ;
+    :k8sSource "Deployment.metadata.labels[sylvatwin.orange.com/nf]" ;
+    :layer "L4" ;
+    :usedInScenario "S3" ;
+    :writtenBy "greffier" .
+
+:dependsOnNF a owl:ObjectProperty ;
+    rdfs:label "depend de la NF"@fr ;
+    rdfs:domain :NetworkFunction ;
+    rdfs:range :NetworkFunction ;
+    rdfs:comment """Dependance DECLAREE dans la configuration : la NF appelle cette autre NF.
+Ici, toutes appellent la NRF (sbi.client.nrf.uri). Permet de propager l'impact
+(S3) : une NRF touchee rend fragiles toutes les NF qui en dependent. Non
+transitive en OWL (chemin SPARQL :dependsOnNF+ dans les regles)."""@fr ;
+    :k8sSource "ConfigMap <nf>-config : <nf>.sbi.client.nrf[].uri (et scp)" ;
+    :layer "L4" ;
+    :usedInScenario "S3" ;
+    :writtenBy "greffier" .
+
+:exposesInterface a owl:ObjectProperty ;
+    rdfs:label "expose l'interface"@fr ;
+    rdfs:domain :NetworkFunction ;
+    rdfs:range :NetworkInterface ;
+    rdfs:comment "Interface ouverte par la NF, telle que declaree dans sa configuration."@fr ;
+    :k8sSource "ConfigMap <nf>-config : sbi.server, ngap.server, pfcp.server, gtpu.server" ;
+    :layer "L4" ;
+    :usedInScenario "S3" ;
+    :writtenBy "greffier" .
+
+:hasPlmn a owl:ObjectProperty ;
+    rdfs:label "sert le PLMN"@fr ;
+    rdfs:domain :NetworkFunction ;
+    rdfs:range :PLMN ;
+    rdfs:comment """PLMN declare dans la configuration de la NF. Seules les NF qui en declarent un
+l'ont (ici NRF, AMF, SMF). Le greffier N'INVENTE PAS de PLMN pour les autres :
+UDM n'en declare pas (Open5GS prend alors une valeur par defaut, non observee).
+S4 compare les PLMN des NF qui en declarent."""@fr ;
+    :k8sSource "ConfigMap : nrf.serving[].plmn_id ; amf.plmn_support[].plmn_id ; smf.info[].tai[].plmn_id" ;
+    :layer "L4" ;
+    :usedInScenario "S4" ;
+    :writtenBy "greffier" .
+
+:servesSlice a owl:ObjectProperty ;
+    rdfs:label "sert la tranche"@fr ;
+    rdfs:domain :NetworkFunction ;
+    rdfs:range :Slice ;
+    rdfs:comment "Tranche (S-NSSAI) declaree dans la configuration de la NF (ici AMF et SMF : SST 1). S4."@fr ;
+    :k8sSource "ConfigMap : amf.plmn_support[].s_nssai ; smf.info[].s_nssai" ;
+    :layer "L4" ;
+    :usedInScenario "S4" ;
+    :writtenBy "greffier" .
+
+:nfName a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "nom de la NF"@fr ;
+    rdfs:domain :NetworkFunction ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Valeur du label sylvatwin.orange.com/nf (amf, udm…)."@fr ;
+    :layer "L4" ; :usedInScenario "S3" , "S4" ; :writtenBy "greffier" .
+
+:interfaceName a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "nom de l'interface"@fr ;
+    rdfs:domain :NetworkInterface ;
+    rdfs:range xsd:string ;
+    rdfs:comment "SBI, N2 (NGAP), N4 (PFCP), N3 (GTP-U)…"@fr ;
+    :layer "L4" ; :usedInScenario "S3" ; :writtenBy "greffier" .
+
+:port a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "port"@fr ;
+    rdfs:domain :NetworkInterface ;
+    rdfs:range xsd:integer ;
+    rdfs:comment "Port d'ecoute (7777 pour la SBI ici)."@fr ;
+    :layer "L4" ; :usedInScenario "S3" ; :writtenBy "greffier" .
+
+:protocol a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "protocole"@fr ;
+    rdfs:domain :NetworkInterface ;
+    rdfs:range xsd:string ;
+    rdfs:comment "TCP, UDP ou SCTP."@fr ;
+    :layer "L4" ; :usedInScenario "S3" ; :writtenBy "greffier" .
+
+:mcc a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "MCC"@fr ; rdfs:domain :PLMN ; rdfs:range xsd:string ;
+    rdfs:comment "Mobile Country Code, en chaine (les zeros de tete comptent)."@fr ;
+    :layer "L4" ; :usedInScenario "S4" ; :writtenBy "greffier" .
+
+:mnc a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "MNC"@fr ; rdfs:domain :PLMN ; rdfs:range xsd:string ;
+    rdfs:comment "Mobile Network Code, en chaine (\"70\" et \"070\" sont differents en 3GPP)."@fr ;
+    :layer "L4" ; :usedInScenario "S4" ; :writtenBy "greffier" .
+
+:sst a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "SST"@fr ; rdfs:domain :Slice ; rdfs:range xsd:integer ;
+    rdfs:comment "Slice/Service Type (1 = eMBB)."@fr ;
+    :layer "L4" ; :usedInScenario "S4" ; :writtenBy "greffier" .
+
+# =============================================================================
+# 9. NOUVELLES DERIVES (ecrites UNIQUEMENT par le juge)
+# =============================================================================
+
+:FunctionImpactDrift a owl:Class ; rdfs:subClassOf :Drift ;
+    rdfs:label "fonction reseau touchee (inter-couches)"@fr , "Function impact drift"@en ;
+    rdfs:comment """S3 : une derive constatee sur une ressource Kubernetes (S0, S1 ou S2) touche une
+fonction reseau, directement (via :realizedBy) ou par dependance (:dependsOnNF+).
+Exemple : Secret udm-keys supprime (S2) -> NF UDM touchee. Elle ne remplace pas
+la derive d'origine : elle la rattache (:causedBy) et designe la NF (:affectsFunction)."""@fr ;
+    :layer "transverse" ;
+    :usedInScenario "S3" ;
+    :writtenBy "juge" .
+
+:InterNFConsistencyDrift a owl:Class ; rdfs:subClassOf :Drift ;
+    rdfs:label "incoherence entre fonctions reseau"@fr , "Inter-NF consistency drift"@en ;
+    rdfs:comment """S4 : deux NF du meme coeur declarent des valeurs incompatibles (PLMN different,
+ou tranche servie par le SMF mais absente de l'AMF). Chaque objet est conforme a
+son Git : ni Flux, ni Kyverno, ni kubectl diff ne le voient."""@fr ;
+    :layer "transverse" ;
+    :usedInScenario "S4" ;
+    :writtenBy "juge" .
+
+:GitOpsSyncDrift a owl:Class ; rdfs:subClassOf :Drift ;
+    rdfs:label "livraison GitOps bloquee"@fr , "GitOps sync drift"@en ;
+    rdfs:comment """S5 : la Kustomization n'applique pas la revision de sa source
+(desiredRevision != actualRevision), ou est suspendue. Le cluster cible n'est
+plus pilote par Git : toutes les ressources gerees heritent du risque."""@fr ;
+    :layer "transverse" ;
+    :usedInScenario "S5" ;
+    :writtenBy "juge" .
+
+:MachineNodeMismatchDrift a owl:Class ; rdfs:subClassOf :Drift ;
+    rdfs:label "Machine et Node incoherents (Cluster API)"@fr , "Machine/Node mismatch drift"@en ;
+    rdfs:comment """S6 : une Machine CAPI hors creation n'a pas de Node, ou un Node du cluster reel
+n'est revendique par aucune Machine du Cluster qui le decrit. La description CAPI
+et le cluster reel ne correspondent plus."""@fr ;
+    :layer "transverse" ;
+    :usedInScenario "S6" ;
+    :writtenBy "juge" .
+
+:affectsFunction a owl:ObjectProperty ;
+    rdfs:label "touche la fonction"@fr ;
+    rdfs:domain :Drift ;
+    rdfs:range :NetworkFunction ;
+    rdfs:comment """NF touchee par une derive (S3, S4). Distincte de :affects, dont la portee est
+une ressource Kubernetes. Ecrit uniquement par les regles."""@fr ;
+    :layer "transverse" ;
+    :usedInScenario "S3" , "S4" ;
+    :writtenBy "juge" .
+
+:causedBy a owl:ObjectProperty ;
+    rdfs:label "causee par"@fr ;
+    rdfs:domain :Drift ;
+    rdfs:range :Drift ;
+    rdfs:comment """Chaine causale entre derives : une FunctionImpactDrift est causee par la derive
+Kubernetes d'origine. C'est la trace inter-couches. Ecrit uniquement par les regles."""@fr ;
+    :layer "transverse" ;
+    :usedInScenario "S3" ;
+    :writtenBy "juge" .
+
+:impactPath a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "chemin d'impact"@fr ;
+    rdfs:domain :Drift ;
+    rdfs:range xsd:string ;
+    rdfs:comment """Comment la derive d'origine atteint la NF : "direct" (la NF est realisee par la
+ressource derivee, ou par le Deployment d'un Pod derive), "dependance" (la NF
+depend d'une NF touchee, :dependsOnNF+), "flux" (la Kustomization qui gere son
+Deployment est bloquee), "infrastructure" (son Pod tourne sur un Node en derive
+Cluster API). Ecrit uniquement par les regles."""@fr ;
+    :layer "transverse" ;
+    :usedInScenario "S3" ;
+    :writtenBy "juge" .
+
+# Disjonctions complementaires (ajout v1.1.0, sans redefinir les termes v1.0.0) :
+# une derive, un label, un cluster reel, une NF, une interface, un PLMN et une
+# tranche sont des choses de natures differentes.
+[] a owl:AllDisjointClasses ;
+    owl:members ( :Drift :Label :KubernetesCluster :NetworkFunction :NetworkInterface :PLMN :Slice ) .

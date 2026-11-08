@@ -1,113 +1,357 @@
 @prefix :     <https://w3id.org/sylvatwin/core#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
-@base         <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/> .
 
 # =============================================================================
-# Exemple d'instances pour sylvatwin-core-v1.ttl (version A).
+# Exemple d'instances pour sylvatwin-core-v1.ttl v1.1.0 (toutes les couches).
 #
-# Photo REELLE du cluster workload, prise le 2026-11-08T13:40:53Z en lecture
-# seule (kubectl get), pour le Deployment udm du namespace sylvatwin-5gc.
-# Rien n'est invente, sauf l'absence d'injection : c'est l'etat SANS derive.
+# Photo REELLE prise en lecture seule (kubectl get), le 2026-11-08 entre
+# 14:51 et 15:02 UTC, sur les deux clusters. ETAT SANS DERIVE.
+# Rien n'est invente. Les variantes avec derive sont construites en memoire par
+# le script de verification (hors depot), pas ecrites ici.
 #
-# Schema d'IRI (decision D1) :
-#   https://w3id.org/sylvatwin/res/<cluster>/<namespace>/<Kind>/<nom>
-#   objet sans namespace : <cluster>/_/<Kind>/<nom>
-#   Label : <IRI de l'objet>/label/<cle>  ou  <IRI du Deployment>/nodeSelector/<cle>
-#           ('/' de la cle encode en %2F)
-# Le @base ci-dessus vaut <cluster>/ ; <sylvatwin-5gc/Deployment/udm> est donc
-# https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Deployment/udm
+# Schema d'IRI :
+#   wl:<ns>/<Kind>/<nom>                objet natif du workload ("_" sans namespace)
+#   mg:<ns>/<Kind>.<groupe>/<nom>       CRD du management (D1-bis, a valider)
+#   <https://w3id.org/sylvatwin/res/<cluster>>  le cluster reel (KubernetesCluster)
+#   wl:sylvatwin-5gc/NetworkFunction/<nf>     NF (+ /interface/<nom>)
+#   glob:PLMN/<mcc>-<mnc>, glob:Slice/sst-<n>  valeurs globales, partagees
 #
-# Etat reel observe :
-#   - udm n'a PAS de nodeSelector dans Git (aucun triplet :requiresNodeLabel) ;
-#     S1 n'est donc pas declenchable tel quel (voir la procedure de label).
-#   - le Secret udm-keys existe (uid observe) mais n'est pas dans Git.
-# Les variantes avec derive (S0 cas A et B, S1, S2) sont construites a partir de
-# ce fichier par le script de verification, pas ecrites ici.
+# Chaine de bout en bout montree :
+#   GitRepository sylvatwin-poc -> Kustomization sylvatwin-5gc -> (cible) workload
+#   -> Deployment udm -> ReplicaSet -> Pod -> Node <- Machine <- Cluster CAPI
+#   <- HelmRelease "cluster" (Flux de Sylva) ; NF UDM -> realisee par udm,
+#   depend de NRF ; PLMN lu dans les ConfigMaps de NRF, AMF et SMF ; BSF
+#   (cible de S1) avec son Deployment, son ReplicaSet et son Pod.
+#
+# Faits observes notables :
+#   - UDM ne declare AUCUN PLMN dans udm-config : pas de triplet :hasPlmn pour
+#     elle (le PLMN 999/70 de son profil NRF n'est pas lu ici, cf. guide §3.12).
+#   - Machine.spec.version = v1.35.6 (KCP), kubelet du Node = v1.35.5 (image
+#     kindest/node:v1.35.5), conditions UpToDate=True : non modelise en version
+#     minimale (pas de paire de versions). Signale comme piste, pas comme derive.
+#   - Secret udm-keys : present, hors Git (absent de l'inventaire Flux).
 # =============================================================================
 
-# --- Namespace ----------------------------------------------------------------
-<_/Namespace/sylvatwin-5gc> a :Namespace ;
-    :clusterName "my-workload-kubeadm-capd" ;
-    :resourceName "sylvatwin-5gc" ;
+# ============================== L1 + CLUSTERS ================================
+
+<https://w3id.org/sylvatwin/res/management-cluster> a :KubernetesCluster ;
+    rdfs:label "management-cluster" ;
+    :clusterDescribedBy <https://w3id.org/sylvatwin/res/management-cluster/sylva-system/Cluster.cluster.x-k8s.io/management-cluster> .   # endpoint 172.30.0.3:6443
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd> a :KubernetesCluster ;
+    rdfs:label "my-workload-kubeadm-capd" ;
+    :clusterDescribedBy <https://w3id.org/sylvatwin/res/management-cluster/my-workload-kubeadm-capd/Cluster.cluster.x-k8s.io/my-workload-kubeadm-capd> .   # endpoint 172.30.0.2:6443
+
+<https://w3id.org/sylvatwin/res/management-cluster/_/Namespace/my-workload-kubeadm-capd> a :Namespace ;
+    :clusterName "management-cluster" ; :resourceName "my-workload-kubeadm-capd" ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/management-cluster> ;
+    :uid "24afaf81-b946-4271-8ced-35393a1ef519" ;
+    :observedAt "2026-11-08T15:02:17Z"^^xsd:dateTime .
+
+<https://w3id.org/sylvatwin/res/management-cluster/_/Namespace/sylva-system> a :Namespace ;
+    :clusterName "management-cluster" ; :resourceName "sylva-system" ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/management-cluster> ;
+    :uid "72ff35cb-f2da-468a-8200-e95dc187569b" ;
+    :observedAt "2026-11-08T15:02:17Z"^^xsd:dateTime .
+
+<https://w3id.org/sylvatwin/res/management-cluster/sylva-system/Cluster.cluster.x-k8s.io/management-cluster> a :Cluster ;
+    :clusterName "management-cluster" ; :resourceName "management-cluster" ;
+    :apiGroup "cluster.x-k8s.io" ;
+    :inNamespace <https://w3id.org/sylvatwin/res/management-cluster/_/Namespace/sylva-system> ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/management-cluster> ;
+    :uid "a520cb87-42c9-42b0-9907-23a55263bc73" ;
+    :observedAt "2026-11-08T15:02:17Z"^^xsd:dateTime .
+
+<https://w3id.org/sylvatwin/res/management-cluster/my-workload-kubeadm-capd/Cluster.cluster.x-k8s.io/my-workload-kubeadm-capd> a :Cluster ;
+    :clusterName "management-cluster" ; :resourceName "my-workload-kubeadm-capd" ;
+    :apiGroup "cluster.x-k8s.io" ;
+    :inNamespace <https://w3id.org/sylvatwin/res/management-cluster/_/Namespace/my-workload-kubeadm-capd> ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/management-cluster> ;
+    :uid "5bf80b45-887b-4516-9127-3ffe7d9bf5b6" ;
+    :ready true ;                                    # condition Available=True (v1beta2 : pas de "Ready")
+    :managedBy <https://w3id.org/sylvatwin/res/management-cluster/my-workload-kubeadm-capd/HelmRelease.helm.toolkit.fluxcd.io/cluster> ;   # label helm.toolkit.fluxcd.io/name=cluster
+    :observedAt "2026-11-08T14:51:47Z"^^xsd:dateTime .
+
+<https://w3id.org/sylvatwin/res/management-cluster/my-workload-kubeadm-capd/Machine.cluster.x-k8s.io/my-workload-kubeadm-capd-control-plane-6w58l> a :Machine ;
+    :clusterName "management-cluster" ; :resourceName "my-workload-kubeadm-capd-control-plane-6w58l" ;
+    :apiGroup "cluster.x-k8s.io" ;
+    :inNamespace <https://w3id.org/sylvatwin/res/management-cluster/_/Namespace/my-workload-kubeadm-capd> ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/management-cluster> ;
+    :uid "7c421418-af81-4912-be16-fb7a7bcc4997" ;
+    :machineOfCluster <https://w3id.org/sylvatwin/res/management-cluster/my-workload-kubeadm-capd/Cluster.cluster.x-k8s.io/my-workload-kubeadm-capd> ;
+    :machineHasNode <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l> ;   # status.nodeRef
+    :machinePhase "Running" ;
+    :observedAt "2026-11-08T14:51:47Z"^^xsd:dateTime .
+
+# ================================ L3 FLUX ====================================
+
+<https://w3id.org/sylvatwin/res/management-cluster/_/Namespace/sylvatwin-flux> a :Namespace ;
+    :clusterName "management-cluster" ; :resourceName "sylvatwin-flux" ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/management-cluster> ;
+    :uid "3599e381-6308-4daa-9933-20a109d4f824" ;
+    :observedAt "2026-11-08T15:02:17Z"^^xsd:dateTime .
+
+<https://w3id.org/sylvatwin/res/management-cluster/sylvatwin-flux/GitRepository.source.toolkit.fluxcd.io/sylvatwin-poc> a :GitRepository ;
+    :clusterName "management-cluster" ; :resourceName "sylvatwin-poc" ;
+    :apiGroup "source.toolkit.fluxcd.io" ;
+    :inNamespace <https://w3id.org/sylvatwin/res/management-cluster/_/Namespace/sylvatwin-flux> ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/management-cluster> ;
+    :uid "26adb963-f036-4b70-9bde-2a54c89afc37" ;
+    :gitUrl "https://github.com/Nidar53/sylvatwin-poc"^^xsd:anyURI ;
+    :gitBranch "test" ;
+    :suspended false ;
+    :ready true ;
+    :observedAt "2026-11-08T14:51:47Z"^^xsd:dateTime .
+
+<https://w3id.org/sylvatwin/res/management-cluster/sylvatwin-flux/Kustomization.kustomize.toolkit.fluxcd.io/sylvatwin-5gc> a :Kustomization ;
+    :clusterName "management-cluster" ; :resourceName "sylvatwin-5gc" ;
+    :apiGroup "kustomize.toolkit.fluxcd.io" ;
+    :inNamespace <https://w3id.org/sylvatwin/res/management-cluster/_/Namespace/sylvatwin-flux> ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/management-cluster> ;
+    :uid "baa28d53-4f59-464c-ac64-19a77ab1ee34" ;
+    :sourcedFrom <https://w3id.org/sylvatwin/res/management-cluster/sylvatwin-flux/GitRepository.source.toolkit.fluxcd.io/sylvatwin-poc> ;
+    :targetsCluster <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd> ;   # kubeConfig sylvatwin-5gc-kubeconfig -> 172.30.0.2:6443
+    :desiredRevision "test@sha1:9099eec76ea8836c3f5ed8d11f8b9ec28323e7d4" ;   # GitRepository.status.artifact.revision
+    :actualRevision  "test@sha1:9099eec76ea8836c3f5ed8d11f8b9ec28323e7d4" ;   # status.lastAppliedRevision
+    :suspended false ;
+    :ready true ;
+    :observedAt "2026-11-08T14:51:47Z"^^xsd:dateTime .
+
+# HelmRelease reelle de Sylva qui produit le Cluster CAPI du workload (lien L3 -> L1).
+<https://w3id.org/sylvatwin/res/management-cluster/my-workload-kubeadm-capd/HelmRelease.helm.toolkit.fluxcd.io/cluster> a :HelmRelease ;
+    :clusterName "management-cluster" ; :resourceName "cluster" ;
+    :apiGroup "helm.toolkit.fluxcd.io" ;
+    :inNamespace <https://w3id.org/sylvatwin/res/management-cluster/_/Namespace/my-workload-kubeadm-capd> ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/management-cluster> ;
+    :uid "31909a74-cb4a-4ce9-98f6-2bc5e5f6e0c9" ;
+    :targetsCluster <https://w3id.org/sylvatwin/res/management-cluster> ;   # pas de kubeConfig : cluster local
+    :desiredRevision "0.0.0+6cc241e1c3b7" ;   # HelmChart my-workload-kubeadm-capd-cluster : artefact
+    :actualRevision  "0.0.0+6cc241e1c3b7" ;   # status.history[0].chartVersion
+    :suspended false ;
+    :ready true ;
+    :observedAt "2026-11-08T15:02:17Z"^^xsd:dateTime .
+
+# ============================ L2 KUBERNETES (WL) =============================
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Namespace/sylvatwin-5gc> a :Namespace ;
+    :clusterName "my-workload-kubeadm-capd" ; :resourceName "sylvatwin-5gc" ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd> ;
     :uid "8490205e-47fa-4366-832b-0713ebfbef25" ;
+    :managedBy <https://w3id.org/sylvatwin/res/management-cluster/sylvatwin-flux/Kustomization.kustomize.toolkit.fluxcd.io/sylvatwin-5gc> ;   # inventaire : _sylvatwin-5gc__Namespace
     :observedAt "2026-11-08T13:40:53Z"^^xsd:dateTime .
 
-# --- Deployment : les trois valeurs de replicas sur le meme individu ----------
-<sylvatwin-5gc/Deployment/udm> a :Deployment ;
-    :clusterName "my-workload-kubeadm-capd" ;
-    :resourceName "udm" ;
-    :inNamespace <_/Namespace/sylvatwin-5gc> ;
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Deployment/udm> a :Deployment ;
+    :clusterName "my-workload-kubeadm-capd" ; :resourceName "udm" ;
+    :inNamespace <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Namespace/sylvatwin-5gc> ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd> ;
     :uid "fd119f6f-65ff-444e-a113-48f390eb63e3" ;
-    :desiredRevision "test@sha1:39f14dedee3535afe74726e97330e4eacf34ed8a" ;
-    :desiredReplicas 1 ;          # Git : usecase/5gc/udm.yaml, spec.replicas
-    :observedSpecReplicas 1 ;     # cluster : spec.replicas
-    :actualReplicas 1 ;           # cluster : status.readyReplicas
-    :referencesSecret <sylvatwin-5gc/Secret/udm-keys> ;   # volumes[udm-keys].secret.secretName
-    :observedAt "2026-11-08T13:40:53Z"^^xsd:dateTime .
+    :managedBy <https://w3id.org/sylvatwin/res/management-cluster/sylvatwin-flux/Kustomization.kustomize.toolkit.fluxcd.io/sylvatwin-5gc> ;   # inventaire : sylvatwin-5gc_udm_apps_Deployment
+    :desiredRevision "test@sha1:9099eec76ea8836c3f5ed8d11f8b9ec28323e7d4" ;
+    :desiredReplicas 1 ; :observedSpecReplicas 1 ; :actualReplicas 1 ;
+    :referencesSecret <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Secret/udm-keys> ;
+    :observedAt "2026-11-08T15:02:17Z"^^xsd:dateTime .
 
-# --- ReplicaSet (ownerReferences -> Deployment/udm, controller=true) ----------
-<sylvatwin-5gc/ReplicaSet/udm-7cf6c5b78d> a :ReplicaSet ;
-    :clusterName "my-workload-kubeadm-capd" ;
-    :resourceName "udm-7cf6c5b78d" ;
-    :inNamespace <_/Namespace/sylvatwin-5gc> ;
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/ReplicaSet/udm-7cf6c5b78d> a :ReplicaSet ;
+    :clusterName "my-workload-kubeadm-capd" ; :resourceName "udm-7cf6c5b78d" ;
+    :inNamespace <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Namespace/sylvatwin-5gc> ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd> ;
     :uid "39ac6715-f499-4517-9aed-80c9533f5841" ;
-    :ownedBy <sylvatwin-5gc/Deployment/udm> ;
-    :observedAt "2026-11-08T13:40:53Z"^^xsd:dateTime .
+    :ownedBy <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Deployment/udm> ;
+    :observedAt "2026-11-08T15:02:17Z"^^xsd:dateTime .
 
-# --- Pod (ownerReferences -> ReplicaSet/udm-7cf6c5b78d) -----------------------
-<sylvatwin-5gc/Pod/udm-7cf6c5b78d-rw6fk> a :Pod ;
-    :clusterName "my-workload-kubeadm-capd" ;
-    :resourceName "udm-7cf6c5b78d-rw6fk" ;
-    :inNamespace <_/Namespace/sylvatwin-5gc> ;
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Pod/udm-7cf6c5b78d-rw6fk> a :Pod ;
+    :clusterName "my-workload-kubeadm-capd" ; :resourceName "udm-7cf6c5b78d-rw6fk" ;
+    :inNamespace <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Namespace/sylvatwin-5gc> ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd> ;
     :uid "03ddabb2-a6fa-4dcd-b954-5920204c11d3" ;
-    :ownedBy <sylvatwin-5gc/ReplicaSet/udm-7cf6c5b78d> ;
-    :runsOn <_/Node/my-workload-kubeadm-capd-control-plane-6w58l> ;
+    :ownedBy <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/ReplicaSet/udm-7cf6c5b78d> ;
+    :runsOn <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l> ;
     :podPhase "Running" ;
-    :observedAt "2026-11-08T13:40:53Z"^^xsd:dateTime .
+    :observedAt "2026-11-08T15:02:17Z"^^xsd:dateTime .
 
-# --- Node et ses 7 labels reels -----------------------------------------------
-<_/Node/my-workload-kubeadm-capd-control-plane-6w58l> a :Node ;
+# NRF : la NF dont UDM depend.
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Deployment/nrf> a :Deployment ;
+    :clusterName "my-workload-kubeadm-capd" ; :resourceName "nrf" ;
+    :inNamespace <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Namespace/sylvatwin-5gc> ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd> ;
+    :uid "0944ef2b-4b04-4db9-b27e-c90f1f4fc11f" ;
+    :managedBy <https://w3id.org/sylvatwin/res/management-cluster/sylvatwin-flux/Kustomization.kustomize.toolkit.fluxcd.io/sylvatwin-5gc> ;
+    :desiredRevision "test@sha1:9099eec76ea8836c3f5ed8d11f8b9ec28323e7d4" ;
+    :desiredReplicas 1 ; :observedSpecReplicas 1 ; :actualReplicas 1 ;
+    :observedAt "2026-11-08T15:02:17Z"^^xsd:dateTime .
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/ReplicaSet/nrf-57b6849ccd> a :ReplicaSet ;
+    :clusterName "my-workload-kubeadm-capd" ; :resourceName "nrf-57b6849ccd" ;
+    :inNamespace <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Namespace/sylvatwin-5gc> ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd> ;
+    :uid "7f7848e4-d908-4dc1-a01f-c356c7a1e845" ;
+    :ownedBy <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Deployment/nrf> ;
+    :observedAt "2026-11-08T15:02:17Z"^^xsd:dateTime .
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Pod/nrf-57b6849ccd-wflfd> a :Pod ;
+    :clusterName "my-workload-kubeadm-capd" ; :resourceName "nrf-57b6849ccd-wflfd" ;
+    :inNamespace <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Namespace/sylvatwin-5gc> ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd> ;
+    :uid "99ddd1ee-94a4-42b6-8f8c-96f798634825" ;
+    :ownedBy <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/ReplicaSet/nrf-57b6849ccd> ;
+    :runsOn <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l> ;
+    :podPhase "Running" ;
+    :observedAt "2026-11-08T15:02:17Z"^^xsd:dateTime .
+
+# AMF et SMF : Deployments presents pour l'inter-NF (S4). Pods non detailles.
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Deployment/amf> a :Deployment ;
+    :clusterName "my-workload-kubeadm-capd" ; :resourceName "amf" ;
+    :inNamespace <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Namespace/sylvatwin-5gc> ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd> ;
+    :uid "505b00ea-bd77-4cd6-a03e-e84d5de345a3" ;
+    :managedBy <https://w3id.org/sylvatwin/res/management-cluster/sylvatwin-flux/Kustomization.kustomize.toolkit.fluxcd.io/sylvatwin-5gc> ;
+    :desiredRevision "test@sha1:9099eec76ea8836c3f5ed8d11f8b9ec28323e7d4" ;
+    :desiredReplicas 1 ; :observedSpecReplicas 1 ; :actualReplicas 1 ;
+    :observedAt "2026-11-08T15:02:17Z"^^xsd:dateTime .
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Deployment/smf> a :Deployment ;
+    :clusterName "my-workload-kubeadm-capd" ; :resourceName "smf" ;
+    :inNamespace <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Namespace/sylvatwin-5gc> ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd> ;
+    :uid "24e676e9-9b5a-4788-99e9-89cafd591452" ;
+    :managedBy <https://w3id.org/sylvatwin/res/management-cluster/sylvatwin-flux/Kustomization.kustomize.toolkit.fluxcd.io/sylvatwin-5gc> ;
+    :desiredRevision "test@sha1:9099eec76ea8836c3f5ed8d11f8b9ec28323e7d4" ;
+    :desiredReplicas 1 ; :observedSpecReplicas 1 ; :actualReplicas 1 ;
+    :observedAt "2026-11-08T15:02:17Z"^^xsd:dateTime .
+
+# BSF : cible du scenario S1 (nodeSelector que tu ajouteras dans bsf.yaml).
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Deployment/bsf> a :Deployment ;
+    :clusterName "my-workload-kubeadm-capd" ; :resourceName "bsf" ;
+    :inNamespace <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Namespace/sylvatwin-5gc> ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd> ;
+    :uid "693de78a-5a9e-4402-9811-fbb5d33ec487" ;
+    :managedBy <https://w3id.org/sylvatwin/res/management-cluster/sylvatwin-flux/Kustomization.kustomize.toolkit.fluxcd.io/sylvatwin-5gc> ;
+    :desiredRevision "test@sha1:9099eec76ea8836c3f5ed8d11f8b9ec28323e7d4" ;
+    :desiredReplicas 1 ; :observedSpecReplicas 1 ; :actualReplicas 1 ;
+    :observedAt "2026-11-08T15:02:17Z"^^xsd:dateTime .
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/ReplicaSet/bsf-78db7b6587> a :ReplicaSet ;
+    :clusterName "my-workload-kubeadm-capd" ; :resourceName "bsf-78db7b6587" ;
+    :inNamespace <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Namespace/sylvatwin-5gc> ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd> ;
+    :uid "2dc32652-0a74-4164-9677-6a8617bdd966" ;
+    :ownedBy <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Deployment/bsf> ;
+    :observedAt "2026-11-08T15:02:17Z"^^xsd:dateTime .
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Pod/bsf-78db7b6587-8wkqn> a :Pod ;
+    :clusterName "my-workload-kubeadm-capd" ; :resourceName "bsf-78db7b6587-8wkqn" ;
+    :inNamespace <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Namespace/sylvatwin-5gc> ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd> ;
+    :uid "a335be44-3bb7-4a71-9585-1d6037067578" ;
+    :ownedBy <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/ReplicaSet/bsf-78db7b6587> ;
+    :runsOn <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l> ;
+    :podPhase "Running" ;
+    :observedAt "2026-11-08T15:02:17Z"^^xsd:dateTime .
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l> a :Node ;
     :clusterName "my-workload-kubeadm-capd" ;
     :resourceName "my-workload-kubeadm-capd-control-plane-6w58l" ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd> ;
     :uid "2fd24ea5-3f64-4403-8bc9-fdf6d9f183d0" ;
     :hasLabel
-        <_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/beta.kubernetes.io%2Farch> ,
-        <_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/beta.kubernetes.io%2Fos> ,
-        <_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/cluster> ,
-        <_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/kubernetes.io%2Farch> ,
-        <_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/kubernetes.io%2Fhostname> ,
-        <_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/kubernetes.io%2Fos> ,
-        <_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/node-role.kubernetes.io%2Fcontrol-plane> ,
-        <_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/node.kubernetes.io%2Fexclude-from-external-load-balancers> ;
-    :observedAt "2026-11-08T13:40:53Z"^^xsd:dateTime .
+        <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/beta.kubernetes.io%2Farch> ,
+        <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/beta.kubernetes.io%2Fos> ,
+        <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/cluster> ,
+        <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/kubernetes.io%2Farch> ,
+        <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/kubernetes.io%2Fhostname> ,
+        <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/kubernetes.io%2Fos> ,
+        <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/node-role.kubernetes.io%2Fcontrol-plane> ,
+        <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/node.kubernetes.io%2Fexclude-from-external-load-balancers> ;
+    :observedAt "2026-11-08T15:02:17Z"^^xsd:dateTime .
 
-<_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/beta.kubernetes.io%2Farch> a :Label ;
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/beta.kubernetes.io%2Farch> a :Label ;
     :hasKey "beta.kubernetes.io/arch" ; :hasValue "amd64" .
-<_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/beta.kubernetes.io%2Fos> a :Label ;
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/beta.kubernetes.io%2Fos> a :Label ;
     :hasKey "beta.kubernetes.io/os" ; :hasValue "linux" .
-<_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/cluster> a :Label ;
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/cluster> a :Label ;
     :hasKey "cluster" ; :hasValue "my-workload-kubeadm-capd" .
-<_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/kubernetes.io%2Farch> a :Label ;
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/kubernetes.io%2Farch> a :Label ;
     :hasKey "kubernetes.io/arch" ; :hasValue "amd64" .
-<_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/kubernetes.io%2Fhostname> a :Label ;
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/kubernetes.io%2Fhostname> a :Label ;
     :hasKey "kubernetes.io/hostname" ; :hasValue "my-workload-kubeadm-capd-control-plane-6w58l" .
-<_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/kubernetes.io%2Fos> a :Label ;
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/kubernetes.io%2Fos> a :Label ;
     :hasKey "kubernetes.io/os" ; :hasValue "linux" .
-<_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/node-role.kubernetes.io%2Fcontrol-plane> a :Label ;
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/node-role.kubernetes.io%2Fcontrol-plane> a :Label ;
     :hasKey "node-role.kubernetes.io/control-plane" ; :hasValue "" .
-<_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/node.kubernetes.io%2Fexclude-from-external-load-balancers> a :Label ;
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Node/my-workload-kubeadm-capd-control-plane-6w58l/label/node.kubernetes.io%2Fexclude-from-external-load-balancers> a :Label ;
     :hasKey "node.kubernetes.io/exclude-from-external-load-balancers" ; :hasValue "" .
 
-# --- Secret (existence seulement, jamais le contenu) --------------------------
-# Cree hors Git (scenario D3 = S2). Le :uid prouve qu'il a ete vu dans le cluster.
-<sylvatwin-5gc/Secret/udm-keys> a :Secret ;
-    :clusterName "my-workload-kubeadm-capd" ;
-    :resourceName "udm-keys" ;
-    :inNamespace <_/Namespace/sylvatwin-5gc> ;
+# Secret hors Git : PAS de :managedBy (absent de l'inventaire de sylvatwin-5gc).
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Secret/udm-keys> a :Secret ;
+    :clusterName "my-workload-kubeadm-capd" ; :resourceName "udm-keys" ;
+    :inNamespace <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/Namespace/sylvatwin-5gc> ;
+    :resourceInCluster <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd> ;
     :uid "184ff885-76c8-4bf9-8d8a-6473a09ca7ff" ;
-    :hasLabel <sylvatwin-5gc/Secret/udm-keys/label/sylvatwin.orange.com%2Fhors-git> ;
-    :observedAt "2026-11-08T13:40:53Z"^^xsd:dateTime .
+    :hasLabel <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Secret/udm-keys/label/sylvatwin.orange.com%2Fhors-git> ;
+    :observedAt "2026-11-08T15:02:17Z"^^xsd:dateTime .
 
-<sylvatwin-5gc/Secret/udm-keys/label/sylvatwin.orange.com%2Fhors-git> a :Label ;
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Secret/udm-keys/label/sylvatwin.orange.com%2Fhors-git> a :Label ;
     :hasKey "sylvatwin.orange.com/hors-git" ; :hasValue "true" .
+
+# =========================== L4 FONCTIONS RESEAU =============================
+# Source : label sylvatwin.orange.com/nf + ConfigMaps <nf>-config (lues le 08/11).
+
+<https://w3id.org/sylvatwin/res/_/PLMN/999-70> a :PLMN ; :mcc "999" ; :mnc "70" .
+<https://w3id.org/sylvatwin/res/_/Slice/sst-1> a :Slice ; :sst 1 .
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/udm> a :UDM ;
+    :nfName "udm" ;
+    :realizedBy <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Deployment/udm> ;
+    :dependsOnNF <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/nrf> ;   # udm.sbi.client.nrf[0].uri
+    :exposesInterface <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/udm/interface/SBI> .
+    # pas de :hasPlmn : udm-config ne declare aucun PLMN (fait observe)
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/udm/interface/SBI> a :NetworkInterface ;
+    :interfaceName "SBI" ; :port 7777 ; :protocol "TCP" .
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/nrf> a :NRF ;
+    :nfName "nrf" ;
+    :realizedBy <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Deployment/nrf> ;
+    :hasPlmn <https://w3id.org/sylvatwin/res/_/PLMN/999-70> ;                           # nrf.serving[0].plmn_id
+    :exposesInterface <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/nrf/interface/SBI> .
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/nrf/interface/SBI> a :NetworkInterface ;
+    :interfaceName "SBI" ; :port 7777 ; :protocol "TCP" .
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/amf> a :AMF ;
+    :nfName "amf" ;
+    :realizedBy <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Deployment/amf> ;
+    :dependsOnNF <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/nrf> ;
+    :hasPlmn <https://w3id.org/sylvatwin/res/_/PLMN/999-70> ;                           # amf.plmn_support[0].plmn_id (et guami, tai)
+    :servesSlice <https://w3id.org/sylvatwin/res/_/Slice/sst-1> ;                       # amf.plmn_support[0].s_nssai[0].sst
+    :exposesInterface <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/amf/interface/SBI> ,
+                      <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/amf/interface/N2> .
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/amf/interface/SBI> a :NetworkInterface ;
+    :interfaceName "SBI" ; :port 7777 ; :protocol "TCP" .
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/amf/interface/N2> a :NetworkInterface ;
+    :interfaceName "N2" ; :port 38412 ; :protocol "SCTP" .   # ngap.server : 127.0.0.1 ; port = defaut Open5GS (absent de la ConfigMap)
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/smf> a :SMF ;
+    :nfName "smf" ;
+    :realizedBy <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Deployment/smf> ;
+    :dependsOnNF <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/nrf> ;
+    :hasPlmn <https://w3id.org/sylvatwin/res/_/PLMN/999-70> ;                           # smf.info[0].tai[0].plmn_id
+    :servesSlice <https://w3id.org/sylvatwin/res/_/Slice/sst-1> ;                       # smf.info[0].s_nssai[0].sst
+    :exposesInterface <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/smf/interface/SBI> ,
+                      <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/smf/interface/N4> .
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/smf/interface/SBI> a :NetworkInterface ;
+    :interfaceName "SBI" ; :port 7777 ; :protocol "TCP" .
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/smf/interface/N4> a :NetworkInterface ;
+    :interfaceName "N4" ; :port 8805 ; :protocol "UDP" .     # pfcp.server : 127.0.0.1 ; port = defaut Open5GS ; aucun UPF
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/bsf> a :BSF ;
+    :nfName "bsf" ;
+    :realizedBy <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/Deployment/bsf> ;
+    :dependsOnNF <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/nrf> ;   # bsf.sbi.client.nrf[0].uri
+    :exposesInterface <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/bsf/interface/SBI> .
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/bsf/interface/SBI> a :NetworkInterface ;
+    :interfaceName "SBI" ; :port 7777 ; :protocol "TCP" .

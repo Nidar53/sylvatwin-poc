@@ -1,0 +1,19 @@
+# JUGE — S4 : InterNFConsistencyDrift sur le PLMN (memes filtres que CQ6).
+# Une derive par paire de NF en desaccord ; :affectsFunction vers les deux NF.
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+CONSTRUCT {
+  ?drift a :InterNFConsistencyDrift ; :affectsFunction ?nf1 , ?nf2 ;
+         :affects ?d1 , ?d2 ; :detectedAt ?now .
+} WHERE {
+  ?nf1 :hasPlmn ?p1 ; :realizedBy ?d1 . ?d1 :inNamespace ?ns .
+  ?nf2 :hasPlmn ?p2 ; :realizedBy ?d2 . ?d2 :inNamespace ?ns .
+  ?p1 :mcc ?mcc1 ; :mnc ?mnc1 . ?p2 :mcc ?mcc2 ; :mnc ?mnc2 .
+  FILTER (STR(?nf1) < STR(?nf2))
+  FILTER (?mcc1 != ?mcc2 || ?mnc1 != ?mnc2)
+  FILTER NOT EXISTS { ?nf1 :hasPlmn ?p2 }
+  FILTER NOT EXISTS { ?nf2 :hasPlmn ?p1 }
+  BIND (NOW() AS ?now)
+  BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/InterNFConsistencyDrift/plmn/",
+        REPLACE(STR(?nf1), "^https://w3id.org/sylvatwin/(res|drift)/", ""), "/", REPLACE(STR(?nf2), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?drift)
+}

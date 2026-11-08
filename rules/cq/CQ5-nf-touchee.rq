@@ -1,0 +1,20 @@
+# CQ5 (S3, inter-couches) — Quelle fonction reseau est touchee par une ressource
+# Kubernetes donnee, directement ou par dependance ?
+# Remplacer ?ressource par l'IRI voulue (ou laisser libre pour tout lister).
+# Direct : la NF est realisee par le Deployment, ou par le Deployment d'un Pod.
+# Dependance : la NF depend (:dependsOnNF+) d'une NF touchee directement.
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT DISTINCT ?ressource ?nf ?chemin WHERE {
+  {
+    ?nfDirecte :realizedBy ?ressource .
+    BIND (?nfDirecte AS ?nf) BIND ("direct" AS ?chemin)
+  } UNION {
+    ?ressource a :Pod ; :ownedBy+ ?d . ?nfDirecte :realizedBy ?d .
+    BIND (?nfDirecte AS ?nf) BIND ("direct" AS ?chemin)
+  } UNION {
+    ?nfDirecte :realizedBy ?ressource .
+    ?nf :dependsOnNF+ ?nfDirecte .
+    BIND ("dependance" AS ?chemin)
+  }
+}

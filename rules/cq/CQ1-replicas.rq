@@ -1,0 +1,19 @@
+# CQ1 (S0) — Quels Deployments ont un nombre de replicas different entre Git,
+# la spec du cluster et le status ? Et de quel cas s'agit-il ?
+#   cas A : desiredReplicas != observedSpecReplicas  -> spec modifiee hors Git
+#   cas B : spec conforme, mais observedSpecReplicas != actualReplicas
+#           -> Kubernetes n'a pas converge
+# Lit : :desiredReplicas, :observedSpecReplicas, :actualReplicas (Deployment).
+# Ne tient pas compte du temps : un deploiement en cours donne un cas B
+# transitoire ; le verdict date (horizon de validite) decidera plus tard.
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT ?deployment ?git ?spec ?status ?cas WHERE {
+  ?deployment a :Deployment ;
+              :desiredReplicas ?git ;
+              :observedSpecReplicas ?spec ;
+              :actualReplicas ?status .
+  BIND( IF(?git != ?spec, "A",
+        IF(?spec != ?status, "B", "")) AS ?cas )
+  FILTER (?cas != "")
+}
