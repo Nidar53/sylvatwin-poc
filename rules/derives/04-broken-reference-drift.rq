@@ -1,11 +1,20 @@
-# JUGE — S2 : BrokenReferenceDrift. Test sur l'absence de :uid (voir CQ4).
+# JUGE — S2 : BrokenReferenceDrift. Test sur l'absence de :uid (voir CQ4),
+# protege par la garde de portee P3 (v1.2.0).
 PREFIX :    <https://w3id.org/sylvatwin/core#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 CONSTRUCT {
   ?drift a :BrokenReferenceDrift ; :affects ?deployment , ?secret ; :detectedAt ?now .
 } WHERE {
-  ?deployment a :Deployment ; :referencesSecret ?secret .
+  ?deployment a :Deployment ; :referencesSecret ?secret ;
+              :inNamespace ?ns ; :resourceInCluster ?kc .
   FILTER NOT EXISTS { ?secret :uid ?u }
+  # GARDE P3 (portee d'observation) : l'absence d'uid ne prouve la disparition du
+  # Secret que si le cluster a ete observe avec succes ET que les Secrets de ce
+  # namespace etaient dans la portee. Sinon : monde ouvert, on ne conclut rien.
+  ?kc :observationStatus "ok" ; :hasObservationScope ?sc .
+  ?sc :scopeKind "Secret" ; :scopeNamespace ?scNs .
+  ?ns :resourceName ?nsName .
+  FILTER (?scNs = "*" || ?scNs = ?nsName)
   BIND (NOW() AS ?now)
   BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/BrokenReferenceDrift/", REPLACE(STR(?secret), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?drift)
 }

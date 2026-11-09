@@ -1,4 +1,4 @@
-# JUGE — S6 : MachineNodeMismatchDrift (memes cas que CQ9).
+# JUGE — S6 : MachineNodeMismatchDrift (memes cas que CQ9), avec garde de portee P3.
 PREFIX :    <https://w3id.org/sylvatwin/core#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 CONSTRUCT {
@@ -10,10 +10,21 @@ CONSTRUCT {
     FILTER (!BOUND(?phase) || ?phase NOT IN ("Pending", "Provisioning", "Deleting"))
     OPTIONAL { ?obj :machineHasNode ?n }
     FILTER ( !BOUND(?n) || NOT EXISTS { ?n :uid ?u } )
+    # GARDE P3 : un Node "sans uid" ne prouve rien si le cluster decrit n'a pas ete
+    # observe avec succes, ou si les Nodes n'etaient pas dans la portee.
+    ?kc :clusterDescribedBy ?cluster ; :observationStatus "ok" ; :hasObservationScope ?scN .
+    ?scN :scopeKind "Node" .
   } UNION {
     ?kc :clusterDescribedBy ?cluster .
     ?obj a :Node ; :resourceInCluster ?kc ; :uid ?u2 .
     FILTER NOT EXISTS { ?m :machineOfCluster ?cluster ; :machineHasNode ?obj . }
+    # GARDE P3 : "aucune Machine ne revendique ce Node" n'a de sens que si les
+    # Machines du cluster de management ont ete observees avec succes.
+    ?cluster :resourceInCluster ?mgmt .
+    ?mgmt :observationStatus "ok" ; :hasObservationScope ?scM .
+    ?scM :scopeKind "Machine" .
+    # ... et que le Node vient d'une observation fraiche du cluster decrit.
+    ?kc :observationStatus "ok" .
   }
   BIND (NOW() AS ?now)
   BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/MachineNodeMismatchDrift/", REPLACE(STR(?obj), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?drift)

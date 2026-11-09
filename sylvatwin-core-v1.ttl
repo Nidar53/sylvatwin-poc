@@ -15,6 +15,8 @@
 #   Transverse       : Drift (+ sous-classes), ecrit uniquement par le juge
 #
 # v1.0.0 -> v1.1.0 : ajouts seulement (aucun terme v1.0.0 retire ni redefini).
+# v1.1.0 -> v1.2.0 : ajouts seulement (synchronisation : portee d'observation,
+#   parametres Flux, cycle de vie des derives). Commentaire de :clusterName corrige.
 #
 # Fichier NOUVEAU. Il ne remplace pas sylvatwin-slice-v0.ttl, garde pour
 # comparaison. Espace de noms DIFFERENT (…/core#) : les deux fichiers peuvent
@@ -63,8 +65,8 @@
 # =============================================================================
 
 <https://w3id.org/sylvatwin/core> a owl:Ontology ;
-    owl:versionIRI <https://w3id.org/sylvatwin/core/1.1.0> ;
-    owl:versionInfo "1.1.0" ;
+    owl:versionIRI <https://w3id.org/sylvatwin/core/1.2.0> ;
+    owl:versionInfo "1.2.0" ;
     dcterms:title "SylvaTwin — ontologie minimale (version A) : Cluster API, Kubernetes, Flux, fonctions 5G"@fr ;
     dcterms:creator "Ahmed Nidhar Sebihi" ;
     dcterms:created "2026-11-08"^^xsd:date ;
@@ -319,7 +321,8 @@ Secret), jamais l'absence du type."""@fr ;
     rdfs:domain :KubernetesResource ;
     rdfs:range xsd:string ;
     rdfs:comment """Cluster ou se trouve l'objet (premier segment de l'IRI). Permet de filtrer
-par cluster sans decouper les IRI. La classe Cluster viendra avec la couche Cluster API."""@fr ;
+par cluster sans decouper les IRI. Le cluster lui-meme est l'individu :KubernetesCluster
+(relie par :resourceInCluster), decrit par l'objet Cluster API :Cluster (:clusterDescribedBy)."""@fr ;
     :k8sSource "contexte du greffier (nom du Cluster CAPI)" ;
     :usedInScenario "S0" , "S1" , "S2" ;
     :writtenBy "greffier" .
@@ -963,3 +966,137 @@ Cluster API). Ecrit uniquement par les regles."""@fr ;
 # tranche sont des choses de natures differentes.
 [] a owl:AllDisjointClasses ;
     owl:members ( :Drift :Label :KubernetesCluster :NetworkFunction :NetworkInterface :PLMN :Slice ) .
+
+# #############################################################################
+# v1.2.0 — SYNCHRONISATION : portee d'observation (P3), parametres Flux,
+# cycle de vie des derives. AJOUTS uniquement.
+# #############################################################################
+
+# --- Portee et statut d'observation, portes par le cluster reel (greffier) ----
+# Ne PAS utiliser :observedAt ni :clusterName sur un KubernetesCluster (domaine
+# KubernetesResource, disjointe) : d'ou des proprietes dediees.
+
+:observationStatus a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "statut d'observation"@fr ;
+    rdfs:domain :KubernetesCluster ;
+    rdfs:range xsd:string ;
+    rdfs:comment """Resultat de la derniere tentative d'observation du cluster : "ok", "unreachable"
+(API injoignable) ou "forbidden" (droits refuses). Si ce n'est pas "ok", les faits
+du cluster sont ceux du dernier instantane reussi : une ABSENCE de fait ne prouve
+alors rien. Les regles fondees sur l'absence (S2, S6) l'exigent "ok" (garde P3)."""@fr ;
+    :k8sSource "resultat de la synchronisation du greffier" ;
+    :layer "L1" ; :usedInScenario "S2" , "S6" ; :writtenBy "greffier" .
+
+:lastSyncTime a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "derniere synchronisation reussie"@fr ;
+    rdfs:domain :KubernetesCluster ;
+    rdfs:range xsd:dateTime ;
+    rdfs:comment """Instant de la derniere observation complete et reussie du cluster. Base de
+l'age de l'information par cluster (verdict date)."""@fr ;
+    :layer "L1" ; :usedInScenario "S2" , "S5" , "S6" ; :writtenBy "greffier" .
+
+:ObservationScope a owl:Class ;
+    rdfs:label "portee d'observation"@fr , "Observation scope"@en ;
+    rdfs:comment """Ce que le greffier a reellement observe dans un cluster : un type de ressource
+(Kind) dans un namespace ("*" = tous). Une regle qui conclut a l'absence d'un
+objet doit verifier que son type et son namespace sont dans la portee (garde P3) :
+hors portee, l'absence ne veut rien dire (monde ouvert)."""@fr ;
+    owl:disjointWith :KubernetesResource , :KubernetesCluster , :Drift , :Label ,
+        :NetworkFunction , :NetworkInterface , :PLMN , :Slice ;
+    :layer "L1" ; :usedInScenario "S2" , "S6" ; :writtenBy "greffier" .
+
+:hasObservationScope a owl:ObjectProperty ;
+    rdfs:label "a pour portee d'observation"@fr ;
+    rdfs:domain :KubernetesCluster ;
+    rdfs:range :ObservationScope ;
+    rdfs:comment "Portees observees dans ce cluster au dernier cycle."@fr ;
+    :layer "L1" ; :usedInScenario "S2" , "S6" ; :writtenBy "greffier" .
+
+:scopeKind a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "type observe"@fr ;
+    rdfs:domain :ObservationScope ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Nom local de la classe observee (\"Secret\", \"Node\", \"Machine\"…)."@fr ;
+    :layer "L1" ; :usedInScenario "S2" , "S6" ; :writtenBy "greffier" .
+
+:scopeNamespace a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "namespace observe"@fr ;
+    rdfs:domain :ObservationScope ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Namespace observe, ou \"*\" pour tous (et pour les types sans namespace)."@fr ;
+    :layer "L1" ; :usedInScenario "S2" , "S6" ; :writtenBy "greffier" .
+
+# --- Parametres Flux (greffier) : bases de l'horizon de convergence ----------
+
+:reconcileInterval a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "intervalle de reconciliation"@fr ;
+    rdfs:domain :CustomResource ;
+    rdfs:range xsd:decimal ;
+    rdfs:comment """spec.interval de la Kustomization, HelmRelease ou GitRepository, EN SECONDES
+(decimal plutot que xsd:duration : comparable en SPARQL sans extension). Sert au
+juge a calculer l'horizon de convergence (derive attendue ou persistante)."""@fr ;
+    :k8sSource "spec.interval" ;
+    :layer "L3" ; :usedInScenario "S0" , "S5" ; :writtenBy "greffier" .
+
+:reconcileTimeout a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "delai maximal de reconciliation"@fr ;
+    rdfs:domain :CustomResource ;
+    rdfs:range xsd:decimal ;
+    rdfs:comment "spec.timeout, en secondes. Ajoute a l'intervalle dans l'horizon."@fr ;
+    :k8sSource "spec.timeout" ;
+    :layer "L3" ; :usedInScenario "S0" , "S5" ; :writtenBy "greffier" .
+
+:retryInterval a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "intervalle de nouvelle tentative"@fr ;
+    rdfs:domain :CustomResource ;
+    rdfs:range xsd:decimal ;
+    rdfs:comment "spec.retryInterval, en secondes (apres un echec de reconciliation)."@fr ;
+    :k8sSource "spec.retryInterval" ;
+    :layer "L3" ; :usedInScenario "S5" ; :writtenBy "greffier" .
+
+:driftDetectionMode a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "mode de detection de derive Helm"@fr ;
+    rdfs:domain :HelmRelease ;
+    rdfs:range xsd:string ;
+    rdfs:comment """spec.driftDetection.mode : "enabled" (Flux corrige), "warn" (Flux signale sans
+corriger : horizon infini) ou "disabled" (absent). Observe : 2 HelmReleases en
+"warn" sur le management."""@fr ;
+    :k8sSource "HelmRelease.spec.driftDetection.mode" ;
+    :layer "L3" ; :usedInScenario "S5" ; :writtenBy "greffier" .
+
+# --- Cycle de vie des derives (juge) -------------------------------------------
+
+:firstDetectedAt a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "premiere detection"@fr ;
+    rdfs:domain :Drift ;
+    rdfs:range xsd:dateTime ;
+    rdfs:comment """Premier cycle ou la derive (meme IRI stable) a ete constatee. Conserve d'un cycle
+a l'autre dans le graphe d'historique du juge (le graphe des faits, lui, est
+reconstruit). Donne l'age de la derive."""@fr ;
+    :layer "transverse" ; :usedInScenario "S0" , "S2" , "S5" ; :writtenBy "juge" .
+
+:lastDetectedAt a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "derniere detection"@fr ;
+    rdfs:domain :Drift ;
+    rdfs:range xsd:dateTime ;
+    rdfs:comment "Dernier cycle ou la derive etait encore constatee."@fr ;
+    :layer "transverse" ; :usedInScenario "S0" , "S2" , "S5" ; :writtenBy "juge" .
+
+:resolvedAt a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "resolue a"@fr ;
+    rdfs:domain :Drift ;
+    rdfs:range xsd:dateTime ;
+    rdfs:comment """Premier cycle ou la derive n'est plus constatee (sur information fraiche). La
+difference resolvedAt - firstDetectedAt mesure le delai reel de correction."""@fr ;
+    :layer "transverse" ; :usedInScenario "S0" , "S5" ; :writtenBy "juge" .
+
+:convergenceHorizon a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "horizon de convergence"@fr ;
+    rdfs:domain :Drift ;
+    rdfs:range xsd:decimal ;
+    rdfs:comment """Delai, en secondes, au-dela duquel la derive n'est plus "attendue" (Flux aurait
+du la corriger) : interval + timeout de la Kustomization qui gere la ressource.
+ABSENT quand aucun outil ne la corrigera (ressource hors Git, Kustomization
+suspendue, HelmRelease en "warn") : l'horizon est alors infini et la derive est
+confirmee des sa detection. Calcule par une regle, jamais par l'operateur."""@fr ;
+    :layer "transverse" ; :usedInScenario "S0" , "S2" , "S5" ; :writtenBy "juge" .

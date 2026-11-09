@@ -1,0 +1,36 @@
+# VERDICT DATE — un verdict par derive OUVERTE de l'historique, emis a ?now.
+#   UnknownVerdict      : information perimee (un cluster pas "ok", ou derniere
+#                         synchronisation plus vieille que __VALIDITY__ secondes)
+#   SuspectedViolation  : age de la derive < horizon de convergence (attendue)
+#   ConfirmedViolation  : age >= horizon, ou pas d'horizon (rien ne corrigera)
+# Entrees : <…/graph/history> (cycle de vie) et <…/graph/facts> (fraicheur).
+# __NOW__ et __VALIDITY__ sont remplaces par l'executeur.
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+CONSTRUCT {
+  ?v a ?classe ; :aboutDrift ?d ; :issuedAt ?now ; :driftAge ?age ;
+     :informationAge ?infoAge ; :validityHorizon ?validity .
+} WHERE {
+  BIND ("__NOW__"^^xsd:dateTime AS ?now)
+  BIND (__VALIDITY__ AS ?validity)
+  GRAPH <https://w3id.org/sylvatwin/graph/history> {
+    ?d :firstDetectedAt ?first .
+    FILTER NOT EXISTS { ?d :resolvedAt ?r }
+    OPTIONAL { ?d :convergenceHorizon ?h }
+  }
+  # age de l'information = plus vieille derniere synchronisation reussie
+  {
+    SELECT (MIN(?ls) AS ?oldestSync) (COUNT(?bad) AS ?nbBad) WHERE {
+      GRAPH <https://w3id.org/sylvatwin/graph/facts> {
+        ?kc a :KubernetesCluster .
+        OPTIONAL { ?kc :lastSyncTime ?ls }
+        OPTIONAL { ?kc :observationStatus ?st . FILTER (?st != "ok") BIND (?kc AS ?bad) }
+      }
+    }
+  }
+  BIND (__SECONDS__(?now, ?first) AS ?age)
+  BIND (__SECONDS__(?now, ?oldestSync) AS ?infoAge)
+  BIND (IF(?nbBad > 0 || !BOUND(?oldestSync) || ?infoAge > ?validity, :UnknownVerdict,
+        IF(BOUND(?h) && ?age < ?h, :SuspectedViolation, :ConfirmedViolation)) AS ?classe)
+  BIND (IRI(CONCAT("https://w3id.org/sylvatwin/verdict/", REPLACE(STR(?d), "^https://w3id.org/sylvatwin/drift/", ""))) AS ?v)
+}

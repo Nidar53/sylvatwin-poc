@@ -3,7 +3,9 @@
 @prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
 
 # =============================================================================
-# Exemple d'instances pour sylvatwin-core-v1.ttl v1.1.0 (toutes les couches).
+# Exemple d'instances pour sylvatwin-core-v1.ttl v1.2.0 (toutes les couches).
+# v1.2.0 : portee et statut d'observation (P3), parametres Flux (observes le
+# 09/11/2026 : sylvatwin-5gc interval 2m, retry 1m, timeout 5m ; HR cluster 24h).
 #
 # Photo REELLE prise en lecture seule (kubectl get), le 2026-11-08 entre
 # 14:51 et 15:02 UTC, sur les deux clusters. ETAT SANS DERIVE.
@@ -36,10 +38,26 @@
 # ============================== L1 + CLUSTERS ================================
 
 <https://w3id.org/sylvatwin/res/management-cluster> a :KubernetesCluster ;
+    :observationStatus "ok" ;
+    :lastSyncTime "2026-11-08T15:02:17Z"^^xsd:dateTime ;
+    :hasObservationScope <https://w3id.org/sylvatwin/res/management-cluster/_/scope/Machine/_all> ,
+        <https://w3id.org/sylvatwin/res/management-cluster/_/scope/Cluster/_all> ,
+        <https://w3id.org/sylvatwin/res/management-cluster/_/scope/Namespace/_all> ,
+        <https://w3id.org/sylvatwin/res/management-cluster/_/scope/GitRepository/_all> ,
+        <https://w3id.org/sylvatwin/res/management-cluster/_/scope/Kustomization/_all> ,
+        <https://w3id.org/sylvatwin/res/management-cluster/_/scope/HelmRelease/_all> ;
     rdfs:label "management-cluster" ;
     :clusterDescribedBy <https://w3id.org/sylvatwin/res/management-cluster/sylva-system/Cluster.cluster.x-k8s.io/management-cluster> .   # endpoint 172.30.0.3:6443
 
 <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd> a :KubernetesCluster ;
+    :observationStatus "ok" ;
+    :lastSyncTime "2026-11-08T15:02:17Z"^^xsd:dateTime ;
+    :hasObservationScope <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/scope/Node/_all> ,
+        <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/scope/Namespace/_all> ,
+        <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/scope/Pod/sylvatwin-5gc> ,
+        <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/scope/ReplicaSet/sylvatwin-5gc> ,
+        <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/scope/Deployment/sylvatwin-5gc> ,
+        <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/scope/Secret/sylvatwin-5gc> ;
     rdfs:label "my-workload-kubeadm-capd" ;
     :clusterDescribedBy <https://w3id.org/sylvatwin/res/management-cluster/my-workload-kubeadm-capd/Cluster.cluster.x-k8s.io/my-workload-kubeadm-capd> .   # endpoint 172.30.0.2:6443
 
@@ -100,6 +118,7 @@
     :uid "26adb963-f036-4b70-9bde-2a54c89afc37" ;
     :gitUrl "https://github.com/Nidar53/sylvatwin-poc"^^xsd:anyURI ;
     :gitBranch "test" ;
+    :reconcileInterval 120.0 ;
     :suspended false ;
     :ready true ;
     :observedAt "2026-11-08T14:51:47Z"^^xsd:dateTime .
@@ -116,6 +135,7 @@
     :actualRevision  "test@sha1:9099eec76ea8836c3f5ed8d11f8b9ec28323e7d4" ;   # status.lastAppliedRevision
     :suspended false ;
     :ready true ;
+    :reconcileInterval 120.0 ; :reconcileTimeout 300.0 ; :retryInterval 60.0 ;
     :observedAt "2026-11-08T14:51:47Z"^^xsd:dateTime .
 
 # HelmRelease reelle de Sylva qui produit le Cluster CAPI du workload (lien L3 -> L1).
@@ -126,6 +146,7 @@
     :resourceInCluster <https://w3id.org/sylvatwin/res/management-cluster> ;
     :uid "31909a74-cb4a-4ce9-98f6-2bc5e5f6e0c9" ;
     :targetsCluster <https://w3id.org/sylvatwin/res/management-cluster> ;   # pas de kubeConfig : cluster local
+    :reconcileInterval 86400.0 ; :driftDetectionMode "enabled" ;
     :desiredRevision "0.0.0+6cc241e1c3b7" ;   # HelmChart my-workload-kubeadm-capd-cluster : artefact
     :actualRevision  "0.0.0+6cc241e1c3b7" ;   # status.history[0].chartVersion
     :suspended false ;
@@ -355,3 +376,17 @@
 
 <https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/bsf/interface/SBI> a :NetworkInterface ;
     :interfaceName "SBI" ; :port 7777 ; :protocol "TCP" .
+
+<https://w3id.org/sylvatwin/res/management-cluster/_/scope/Machine/_all> a :ObservationScope ; :scopeKind "Machine" ; :scopeNamespace "*" .
+<https://w3id.org/sylvatwin/res/management-cluster/_/scope/Cluster/_all> a :ObservationScope ; :scopeKind "Cluster" ; :scopeNamespace "*" .
+<https://w3id.org/sylvatwin/res/management-cluster/_/scope/Namespace/_all> a :ObservationScope ; :scopeKind "Namespace" ; :scopeNamespace "*" .
+<https://w3id.org/sylvatwin/res/management-cluster/_/scope/GitRepository/_all> a :ObservationScope ; :scopeKind "GitRepository" ; :scopeNamespace "*" .
+<https://w3id.org/sylvatwin/res/management-cluster/_/scope/Kustomization/_all> a :ObservationScope ; :scopeKind "Kustomization" ; :scopeNamespace "*" .
+<https://w3id.org/sylvatwin/res/management-cluster/_/scope/HelmRelease/_all> a :ObservationScope ; :scopeKind "HelmRelease" ; :scopeNamespace "*" .
+
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/scope/Node/_all> a :ObservationScope ; :scopeKind "Node" ; :scopeNamespace "*" .
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/scope/Namespace/_all> a :ObservationScope ; :scopeKind "Namespace" ; :scopeNamespace "*" .
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/scope/Pod/sylvatwin-5gc> a :ObservationScope ; :scopeKind "Pod" ; :scopeNamespace "sylvatwin-5gc" .
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/scope/ReplicaSet/sylvatwin-5gc> a :ObservationScope ; :scopeKind "ReplicaSet" ; :scopeNamespace "sylvatwin-5gc" .
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/scope/Deployment/sylvatwin-5gc> a :ObservationScope ; :scopeKind "Deployment" ; :scopeNamespace "sylvatwin-5gc" .
+<https://w3id.org/sylvatwin/res/my-workload-kubeadm-capd/_/scope/Secret/sylvatwin-5gc> a :ObservationScope ; :scopeKind "Secret" ; :scopeNamespace "sylvatwin-5gc" .

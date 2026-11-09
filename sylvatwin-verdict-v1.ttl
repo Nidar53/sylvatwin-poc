@@ -1,0 +1,112 @@
+@prefix :        <https://w3id.org/sylvatwin/core#> .
+@prefix owl:     <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+# =============================================================================
+# SylvaTwin — VERDICT DATE, aligne sur l'espace core# (v1).
+#
+# Remplace, pour l'ontologie v1, sylvatwin-verdict-tbox.ttl (espace k8s#, v0),
+# qui est CONSERVE tel quel pour comparaison et parce que verdict.py (v0) en
+# depend. Les termes reprennent ceux de la v0 (meme nom local, meme sens) dans
+# l'espace core#, plus deux verdicts nouveaux :
+#   SuspectedViolation  : derive constatee, plus jeune que l'horizon de
+#                         convergence Flux -> attendue, Flux devrait la corriger
+#   ConfirmedViolation  : derive constatee, plus vieille que l'horizon, ou
+#                         sans horizon (personne ne la corrigera)
+# Verdict "inconnu" : information trop vieille (UnknownVerdict).
+#
+# Tout ce fichier est ecrit par le JUGE (regles rules/verdict/*.rq), jamais par
+# l'operateur. Importe sylvatwin-core-v1.ttl.
+# =============================================================================
+
+<https://w3id.org/sylvatwin/core/verdict> a owl:Ontology ;
+    owl:imports <https://w3id.org/sylvatwin/core> ;
+    owl:versionInfo "1.0.0" ;
+    dcterms:title "SylvaTwin — verdict date (v1, espace core#)"@fr ;
+    dcterms:creator "Ahmed Nidhar Sebihi" ;
+    rdfs:comment """Les verdicts de conformite comme individus du jumeau, qualifies par l'age de
+l'information et par l'horizon de convergence de l'outil GitOps."""@fr .
+
+dcterms:title   a owl:AnnotationProperty .
+dcterms:creator a owl:AnnotationProperty .
+
+:Verdict a owl:Class ;
+    rdfs:label "verdict"@fr ;
+    rdfs:comment "Resultat date du jugement porte sur une derive (ou sur une contrainte)."@fr ;
+    owl:disjointWith :KubernetesResource , :Drift , :KubernetesCluster , :NetworkFunction ;
+    :usedInScenario "S0" , "S2" , "S5" ; :writtenBy "juge" .
+
+:ConformVerdict a owl:Class ; rdfs:subClassOf :Verdict ;
+    rdfs:label "verdict conforme"@fr ;
+    rdfs:comment "Aucune derive, sur information fraiche. (Repris de la v0.)"@fr ;
+    :usedInScenario "S0" ; :writtenBy "juge" .
+
+:ViolatedVerdict a owl:Class ; rdfs:subClassOf :Verdict ;
+    rdfs:label "verdict de violation"@fr ;
+    rdfs:comment "Derive constatee sur information fraiche. (Repris de la v0.) Deux sous-classes."@fr ;
+    :usedInScenario "S0" , "S2" , "S5" ; :writtenBy "juge" .
+
+:SuspectedViolation a owl:Class ; rdfs:subClassOf :ViolatedVerdict ;
+    rdfs:label "derive suspectee"@fr ;
+    rdfs:comment """Derive constatee sur information fraiche, mais plus jeune que son horizon de
+convergence : l'outil GitOps devrait la corriger de lui-meme. A surveiller, pas a
+traiter. Exemple : kubectl scale sur un Deployment gere par une Kustomization a 2 min."""@fr ;
+    :usedInScenario "S0" ; :writtenBy "juge" .
+
+:ConfirmedViolation a owl:Class ; rdfs:subClassOf :ViolatedVerdict ;
+    rdfs:label "derive confirmee"@fr ;
+    rdfs:comment """Derive constatee sur information fraiche, et plus vieille que son horizon de
+convergence, ou sans horizon (ressource hors Git, Kustomization suspendue, Helm en
+"warn", incoherence entre NF conforme a Git) : rien ne la corrigera."""@fr ;
+    :usedInScenario "S0" , "S2" , "S5" ; :writtenBy "juge" .
+
+:UnknownVerdict a owl:Class ; rdfs:subClassOf :Verdict ;
+    rdfs:label "verdict inconnu"@fr ;
+    rdfs:comment """Information trop vieille (cluster injoignable, ou derniere synchronisation plus
+ancienne que l'horizon de validite) : aucune conclusion. (Repris de la v0.)"""@fr ;
+    :usedInScenario "S2" , "S6" ; :writtenBy "juge" .
+
+[] a owl:AllDisjointClasses ;
+    owl:members ( :ConformVerdict :ViolatedVerdict :UnknownVerdict ) .
+:SuspectedViolation owl:disjointWith :ConfirmedViolation .
+
+:aboutDrift a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:label "porte sur la derive"@fr ;
+    rdfs:domain :Verdict ; rdfs:range :Drift ;
+    rdfs:comment "La derive jugee (IRI stable). Nouveau en v1 : la v0 jugeait des contraintes."@fr ;
+    :usedInScenario "S0" , "S2" , "S5" ; :writtenBy "juge" .
+
+:driftAge a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "age de la derive"@fr ;
+    rdfs:domain :Verdict ; rdfs:range xsd:decimal ;
+    rdfs:comment "Secondes ecoulees depuis :firstDetectedAt de la derive, a l'instant du verdict."@fr ;
+    :usedInScenario "S0" , "S2" , "S5" ; :writtenBy "juge" .
+
+:informationAge a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "age de l'information"@fr ;
+    rdfs:domain :Verdict ; rdfs:range xsd:decimal ;
+    rdfs:comment """Age, en secondes, de la plus vieille observation qui soutient le verdict (ici :
+:lastSyncTime du cluster concerne). Le maillon le plus faible decide. (Repris de la v0.)"""@fr ;
+    :usedInScenario "S2" , "S6" ; :writtenBy "juge" .
+
+:validityHorizon a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "horizon de validite"@fr ;
+    rdfs:domain :Verdict ; rdfs:range xsd:decimal ;
+    rdfs:comment """Au-dela de cet age (secondes), l'information est perimee et le verdict devient
+inconnu. (Repris de la v0, ou il etait mesure ; ici fourni comme parametre de la
+regle de verdict.)"""@fr ;
+    :usedInScenario "S2" , "S6" ; :writtenBy "juge" .
+
+:issuedAt a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "emis a"@fr ;
+    rdfs:domain :Verdict ; rdfs:range xsd:dateTime ;
+    rdfs:comment "Instant d'emission du verdict. (Repris de la v0.)"@fr ;
+    :usedInScenario "S0" , "S2" , "S5" ; :writtenBy "juge" .
+
+# Non repris de la v0 (ils restent dans sylvatwin-verdict-tbox.ttl) : Constraint,
+# derivedFromField, readsProperty, detectsDrift, aboutConstraint, aboutResource,
+# evidence, limitedBy, stalenessRatio, TwinState et ses compteurs. Ils servent au
+# compilateur de contraintes SHACL (compile_intent.py, v0), que la v1 ne remplace
+# pas encore.
