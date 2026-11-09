@@ -41,3 +41,25 @@ Exemples :
 
 - `drift/BrokenReferenceDrift/my-workload-kubeadm-capd/sylvatwin-5gc/Secret/udm-keys`
 - `drift/FunctionImpactDrift/BrokenReferenceDrift/…/Secret/udm-keys/my-workload-kubeadm-capd/sylvatwin-5gc/NetworkFunction/udm`
+
+## v1.2.0 : portée, cycle de vie et verdict
+
+- **Garde P3 (portée d'observation).** Les règles `04` (S2) et `08` (S6) ne concluent à l'absence d'un objet que si deux conditions sont réunies :
+  - le cluster est `:observationStatus "ok"` ;
+  - le type (et le namespace) fait partie d'une `:ObservationScope` observée.
+- **`lifecycle/`** : quatre requêtes SPARQL Update, exécutées après `derives/`. Elles tiennent l'historique dans le graphe nommé `…/graph/history` : `firstDetectedAt`, `lastDetectedAt`, `resolvedAt` et `convergenceHorizon`.
+- **`verdict/01-verdict.rq`** : classe chaque dérive en `SuspectedViolation`, `ConfirmedViolation` ou `UnknownVerdict` (vocabulaire défini dans `sylvatwin-verdict-v1.ttl`).
+- **Graphes nommés** : ils servent seulement à séparer les faits (`…/graph/facts`), les dérives du cycle (`…/graph/drifts`) et l'historique (`…/graph/history`). L'Option C reste inchangée : désiré et observé sont portés par le même individu.
+
+## Formes SPARQL à éviter (portabilité)
+
+Constaté le 09/11/2026 avec rdflib 7.6, en comparant chaque `DELETE … WHERE` à la requête `SELECT` qui a le même `WHERE`. Deux constructions donnent des résultats différents :
+
+- `OPTIONAL { … } FILTER(!BOUND(?x))` placé **à l'intérieur** d'un bloc `GRAPH` ;
+- `FILTER NOT EXISTS` imbriqué dans un `MINUS`.
+
+Les règles placent donc leurs `OPTIONAL` en dehors des blocs `GRAPH`. Le test de conformité rdflib/Oxigraph de l'opérateur rejoue toutes les règles pour le vérifier.
+
+## Vérification
+
+`python3 tests/verif_v1.py`
