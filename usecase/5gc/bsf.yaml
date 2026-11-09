@@ -12,6 +12,8 @@ spec:
       labels: {app.kubernetes.io/name: bsf, app.kubernetes.io/part-of: sylvatwin-5gc, sylvatwin.orange.com/nf: bsf}
     spec:
       automountServiceAccountToken: false
+      nodeSelector:
+        sylvatwin.orange.com/zone: a
       securityContext:
         runAsNonRoot: true
         runAsUser: 999
