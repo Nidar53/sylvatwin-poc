@@ -6,7 +6,9 @@
 |---|---|
 | `UnknownVerdict` | Un cluster n'est pas `ok`, ou sa dernière synchronisation réussie est plus vieille que l'horizon de validité (paramètre `__VALIDITY__`, en secondes). |
 | `SuspectedViolation` | L'âge de la dérive est inférieur à son horizon de convergence : Flux devrait la corriger. |
-| `ConfirmedViolation` | L'âge est supérieur ou égal à l'horizon, ou il n'y a pas d'horizon (hors Git, suspension, incohérence entre NF, référence cassée). |
+| `ConfirmedViolation` | L'âge est supérieur ou égal à l'horizon, ou il n'y a pas d'horizon : ressource hors Git, Kustomization suspendue, mauvais placement, incohérence entre NF, référence cassée. |
+
+**Limite connue.** Une `ConvergenceDrift` reçoit l'horizon de Flux (`interval` + `timeout`) alors que Flux ne la corrige pas. L'horizon juste serait plutôt `progressDeadlineSeconds` du Deployment, qui n'est pas encore modélisé.
 
 ## Calcul de durée
 

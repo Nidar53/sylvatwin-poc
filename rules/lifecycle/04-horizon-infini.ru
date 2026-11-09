@@ -3,9 +3,14 @@
 #   (a) une ressource touchee, vue dans le cluster, n'est geree par aucune
 #       Kustomization (hors Git ; les Pods et Nodes ne sont jamais geres
 #       directement : ils ne comptent pas) ;
-#   (b) derive de type GitOpsSync, InterNFConsistency (conforme a Git), BrokenReference
-#       (la cible manque : rien a re-appliquer cote Flux pour un Secret hors Git),
+#   (b) derive de type PlacementDrift (Kubernetes n'evince pas, Flux ne regarde pas
+#       les noeuds), InterNFConsistency (conforme a Git), BrokenReference (la cible
+#       manque : rien a re-appliquer cote Flux pour un Secret hors Git),
 #       MachineNodeMismatch (hors perimetre Flux) ;
+#   NB : GitOpsSyncDrift n'est PAS dans la liste : sur une Kustomization active,
+#   Flux livrera (horizon = interval + timeout, calcule par 03) ; sur une
+#   Kustomization SUSPENDUE, 03 n'ecrit pas d'horizon -> infini. (Correction du
+#   10/11/2026, avant les scenarios : un push Git normal etait "confirme".)
 #   (c) FunctionImpactDrift : memes cas, appliques a sa derive d'origine.
 PREFIX :    <https://w3id.org/sylvatwin/core#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
@@ -25,12 +30,12 @@ WHERE {
     FILTER (!BOUND(?m) && !BOUND(?cl))
   } UNION {
     GRAPH <https://w3id.org/sylvatwin/graph/drifts> {
-      ?d a ?ty . FILTER (?ty IN (:GitOpsSyncDrift, :InterNFConsistencyDrift,
+      ?d a ?ty . FILTER (?ty IN (:PlacementDrift, :InterNFConsistencyDrift,
                                  :BrokenReferenceDrift, :MachineNodeMismatchDrift)) }
   } UNION {
     # FunctionImpactDrift dont la cause est d'un de ces types : horizon infini aussi
     GRAPH <https://w3id.org/sylvatwin/graph/drifts> {
-      ?d :causedBy ?o2 . ?o2 a ?ty2 . FILTER (?ty2 IN (:GitOpsSyncDrift, :InterNFConsistencyDrift,
+      ?d :causedBy ?o2 . ?o2 a ?ty2 . FILTER (?ty2 IN (:PlacementDrift, :InterNFConsistencyDrift,
                                  :BrokenReferenceDrift, :MachineNodeMismatchDrift)) }
   }
 }

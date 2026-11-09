@@ -267,6 +267,12 @@ check("S0-A t=600 s (Flux a corrige) : derive resolue, plus de verdict", r600 ==
 # S2 (hors Git) : confirmee immediatement
 ds = Dataset(); r = cycle(ds, facts_at("S2", 10), now_at(10))
 check("verdict S2 t=10 s : BrokenReference confirmee immediatement (hors Git, pas d'horizon)", ("BrokenReferenceDrift", "ConfirmedViolation") in r, str(sorted(r)))
+# S5 retard (Kustomization active, commit pas encore applique) : SUSPECTEE (Flux livrera)
+ds = Dataset(); r = cycle(ds, facts_at("S5-retard", 10), now_at(10))
+check("verdict S5-retard t=10 s : GitOpsSync suspectee (Ks active, horizon 420 s)", ("GitOpsSyncDrift", "SuspectedViolation") in r, str(sorted(r)))
+# S1 placement : confirmee immediatement (Kubernetes n'evince pas)
+ds = Dataset(); r = cycle(ds, facts_at("S1-retire", 10), now_at(10))
+check("verdict S1 t=10 s : PlacementDrift confirmee immediatement", ("PlacementDrift", "ConfirmedViolation") in r, str(sorted(r)))
 # S5 suspend : confirmee immediatement
 ds = Dataset(); r = cycle(ds, facts_at("S5-suspend", 10), now_at(10))
 check("verdict S5 t=10 s : GitOpsSync confirmee immediatement", ("GitOpsSyncDrift", "ConfirmedViolation") in r, str(sorted(r)))
