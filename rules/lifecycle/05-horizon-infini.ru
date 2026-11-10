@@ -6,7 +6,8 @@
 #   (b) derive de type PlacementDrift (Kubernetes n'evince pas, Flux ne regarde pas
 #       les noeuds), InterNFConsistency (conforme a Git), BrokenReference (la cible
 #       manque : rien a re-appliquer cote Flux pour un Secret hors Git),
-#       MachineNodeMismatch (hors perimetre Flux) ;
+#       MachineNodeMismatch (hors perimetre Flux), StaleConfigDrift (Flux ne
+#       redemarre jamais un pod : voir rules/derives/09) ;
 #   NB : GitOpsSyncDrift n'est PAS dans la liste : sur une Kustomization active,
 #   Flux livrera (horizon = interval + timeout, calcule par 03) ; sur une
 #   Kustomization SUSPENDUE, 03 n'ecrit pas d'horizon -> infini. (Correction du
@@ -31,11 +32,11 @@ WHERE {
   } UNION {
     GRAPH <https://w3id.org/sylvatwin/graph/drifts> {
       ?d a ?ty . FILTER (?ty IN (:PlacementDrift, :InterNFConsistencyDrift,
-                                 :BrokenReferenceDrift, :MachineNodeMismatchDrift)) }
+                                 :BrokenReferenceDrift, :MachineNodeMismatchDrift, :StaleConfigDrift)) }
   } UNION {
     # FunctionImpactDrift dont la cause est d'un de ces types : horizon infini aussi
     GRAPH <https://w3id.org/sylvatwin/graph/drifts> {
       ?d :causedBy ?o2 . ?o2 a ?ty2 . FILTER (?ty2 IN (:PlacementDrift, :InterNFConsistencyDrift,
-                                 :BrokenReferenceDrift, :MachineNodeMismatchDrift)) }
+                                 :BrokenReferenceDrift, :MachineNodeMismatchDrift, :StaleConfigDrift)) }
   }
 }

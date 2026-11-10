@@ -17,6 +17,8 @@
 # v1.0.0 -> v1.1.0 : ajouts seulement (aucun terme v1.0.0 retire ni redefini).
 # v1.1.0 -> v1.2.0 : ajouts seulement (synchronisation : portee d'observation,
 #   parametres Flux, cycle de vie des derives). Commentaire de :clusterName corrige.
+# v1.2.0 -> v1.3.0 : ajouts seulement (Watch temoin, age de l'information,
+#   horizon de ConvergenceDrift corrige, ConfigMap + StaleConfigDrift (D4), SCP).
 #
 # Fichier NOUVEAU. Il ne remplace pas sylvatwin-slice-v0.ttl, garde pour
 # comparaison. Espace de noms DIFFERENT (…/core#) : les deux fichiers peuvent
@@ -65,8 +67,8 @@
 # =============================================================================
 
 <https://w3id.org/sylvatwin/core> a owl:Ontology ;
-    owl:versionIRI <https://w3id.org/sylvatwin/core/1.2.0> ;
-    owl:versionInfo "1.2.0" ;
+    owl:versionIRI <https://w3id.org/sylvatwin/core/1.3.0> ;
+    owl:versionInfo "1.3.0" ;
     dcterms:title "SylvaTwin — ontologie minimale (version A) : Cluster API, Kubernetes, Flux, fonctions 5G"@fr ;
     dcterms:creator "Ahmed Nidhar Sebihi" ;
     dcterms:created "2026-11-08"^^xsd:date ;
@@ -1100,3 +1102,119 @@ ABSENT quand aucun outil ne la corrigera (ressource hors Git, Kustomization
 suspendue, HelmRelease en "warn") : l'horizon est alors infini et la derive est
 confirmee des sa detection. Calcule par une regle, jamais par l'operateur."""@fr ;
     :layer "transverse" ; :usedInScenario "S0" , "S2" , "S5" ; :writtenBy "juge" .
+
+# #############################################################################
+# v1.2.0 -> v1.3.0 — AJOUTS (article complet, 10/11/2026) :
+#   - Watch temoin (P1) + age de l'information A_c(t) (partie 2)
+#   - horizon de convergence des ConvergenceDrift : progressDeadlineSeconds du
+#     Deployment, PAS celui de Flux (correction partie 3, limite notee le 09/11)
+#   - ConfigMap (classe), mountsConfigMap, lastModifiedAt -> StaleConfigDrift (D4)
+#   - SCP (sous-classe de NetworkFunction)
+# Rien ne redefinit ni ne retire un terme existant.
+# #############################################################################
+
+# --- Watch temoin et age de l'information (partie 2) -------------------------
+
+:witnessLeaseName a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "nom de la Lease temoin"@fr ;
+    rdfs:domain :KubernetesCluster ; rdfs:range xsd:string ;
+    rdfs:comment """Nom de la Lease de nœud (kube-node-lease) surveillee par Watch comme temoin de
+vie du canal d'observation. On ne surveille PAS les Lease par defaut (exigence
+temps reel, partie 1) : seule CETTE Lease precise est un Watch dedie, minimal."""@fr ;
+    :k8sSource "coordination.k8s.io/v1 Lease, namespace kube-node-lease" ;
+    :layer "L1" ; :usedInScenario "fraicheur" ; :writtenBy "greffier" .
+
+:lastWitnessRenewTime a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "dernier renouvellement du temoin"@fr ;
+    rdfs:domain :KubernetesCluster ; rdfs:range xsd:dateTime ;
+    rdfs:comment """u_c(t) : instant du dernier evenement Watch recu sur la Lease temoin. Sert a
+calculer l'age de l'information A_c(t) = t - u_c(t) (juge), independamment de
+:lastSyncTime (qui date la derniere RECONSTRUCTION du graphe, pas la derniere
+preuve de vie du canal)."""@fr ;
+    :k8sSource "Lease.spec.renewTime, evenement Watch" ;
+    :layer "L1" ; :usedInScenario "fraicheur" ; :writtenBy "greffier" .
+
+:freshnessHorizon a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "horizon de fraicheur (theta)"@fr ;
+    rdfs:domain :KubernetesCluster ; rdfs:range xsd:decimal ;
+    rdfs:comment """H_frais (theta), en secondes : au-dela de A_c(t), le canal vers ce cluster est
+declare perime (tous ses verdicts deviennent UnknownVerdict). Parametre de
+deploiement (defaut 3 x periode de renouvellement du temoin, soit 30 s pour un
+kubelet standard dont la Lease se renouvelle toutes les 10 s)."""@fr ;
+    :layer "L1" ; :usedInScenario "fraicheur" ; :writtenBy "greffier" .
+
+# --- Horizon de convergence propre a ConvergenceDrift (correction partie 3) --
+
+:progressDeadlineSeconds a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "delai de progression (Kubernetes)"@fr ;
+    rdfs:domain :Deployment ; rdfs:range xsd:decimal ;
+    rdfs:comment """spec.progressDeadlineSeconds (defaut Kubernetes : 600 s si absent). C'est le
+delai que KUBERNETES lui-meme accorde a un Deployment pour converger avant de le
+marquer en echec de progression. Sert d'horizon de convergence pour
+ConvergenceDrift (PAS l'horizon Flux interval+timeout : correction du 10/11/2026,
+le constat du 09/11 etait une approximation volontairement grossiere - voir
+rapport, campagne du 09/11)."""@fr ;
+    :k8sSource "Deployment.spec.progressDeadlineSeconds" ;
+    :usedInScenario "S0" ; :writtenBy "greffier" .
+
+# --- ConfigMap et StaleConfigDrift (D4, partie 3) -----------------------------
+
+:ConfigMap a owl:Class ; rdfs:subClassOf :KubernetesResource ;
+    rdfs:label "ConfigMap"@fr , "ConfigMap"@en ;
+    rdfs:comment """Une ConfigMap Kubernetes. Comme pour Secret, le jumeau n'en stocke JAMAIS le
+CONTENU : seulement son existence et l'instant de sa derniere modification
+(:lastModifiedAt), pour detecter D4 (un Pod demarre avant la derniere mise a
+jour de la ConfigMap qu'il monte -> il tourne avec une config perimee)."""@fr ;
+    :usedInScenario "D4" ; :writtenBy "greffier" .
+
+[] a owl:AllDisjointClasses ;
+    owl:members ( :ConfigMap :Namespace :Deployment :ReplicaSet :Pod :Node :Secret :CustomResource ) .
+
+:mountsConfigMap a owl:ObjectProperty ;
+    rdfs:label "monte la ConfigMap"@fr ;
+    rdfs:domain :Deployment ; rdfs:range :ConfigMap ;
+    rdfs:comment """Le pod template du Deployment monte cette ConfigMap en volume (meme perimetre
+que :referencesSecret, mais pour les ConfigMaps). Base de D4 : comparer
+:lastModifiedAt de la ConfigMap a :startedAt du Pod qui en depend (via le meme
+Deployment)."""@fr ;
+    :k8sSource "Deployment.spec.template.spec.volumes[].configMap.name" ;
+    :usedInScenario "D4" ; :writtenBy "greffier" .
+
+:lastModifiedAt a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "derniere modification"@fr ;
+    rdfs:domain :ConfigMap ; rdfs:range xsd:dateTime ;
+    rdfs:comment """Instant de la derniere ecriture de la ConfigMap, lu dans metadata.managedFields
+(le plus recent des champs 'time', tous gestionnaires confondus). Fait brut :
+le greffier ne sait pas SI le Pod a rechargé cette version, seulement QUAND elle
+a change. C'est la regle (juge) qui compare a :startedAt du Pod."""@fr ;
+    :k8sSource "ConfigMap.metadata.managedFields[].time (max)" ;
+    :usedInScenario "D4" ; :writtenBy "greffier" .
+
+:startedAt a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "demarre a"@fr ;
+    rdfs:domain :Pod ; rdfs:range xsd:dateTime ;
+    rdfs:comment "Pod.status.startTime : instant ou le pod a demarre (et donc lu sa configuration montee UNE FOIS, au demarrage)."@fr ;
+    :k8sSource "Pod.status.startTime" ;
+    :usedInScenario "D4" ; :writtenBy "greffier" .
+
+:StaleConfigDrift a owl:Class ; rdfs:subClassOf :Drift ;
+    rdfs:label "configuration perimee (D4)"@fr , "Stale config drift"@en ;
+    rdfs:comment """D4 : un Pod a demarre AVANT la derniere modification de la ConfigMap qu'il
+monte (via son Deployment). Le pod tourne donc, EN MEMOIRE, avec une version
+plus ancienne que celle que l'API renvoie. Flux ne le voit pas : la ConfigMap
+EST a jour dans l'API, conforme a Git ; seul le processus en memoire ne l'est
+pas. Confirme par exec le 09/11/2026 sur nrf et smf (campagne S4-a/S4-b, pods
+non redemarres apres la correction par Flux)."""@fr ;
+    :layer "transverse" ; :usedInScenario "D4" ; :writtenBy "juge" .
+
+# --- SCP (partie 3 : classe manquante trouvee lors de l'audit du 09/11) ------
+
+:SCP a owl:Class ; rdfs:subClassOf :NetworkFunction ; rdfs:label "SCP"@fr ;
+    rdfs:comment """Service Communication Proxy. Deployee sur le banc (ns sylvatwin-5gc) mais
+ABSENTE de la v1.2.0 : sans classe, elle n'apparaissait dans aucun
+:affectsFunction (trouve lors de l'audit de l'etat sain du 09/11/2026, avant
+d'ajouter cette classe)."""@fr ;
+    :layer "L4" ; :usedInScenario "S3" ; :writtenBy "greffier" .
+
+[] a owl:AllDisjointClasses ;
+    owl:members ( :AMF :SMF :UPF :NRF :AUSF :UDM :UDR :PCF :NSSF :BSF :SCP ) .

@@ -284,5 +284,72 @@ ds = Dataset(); cycle(ds, facts_at("S2", 10), now_at(10)); f = unreachable(facts
 r = cycle(ds, f, now_at(70)); res = list(ds.graph(HIST).subject_objects(C.resolvedAt))
 check("P3 : cluster devenu injoignable -> derive NON resolue, verdict inconnu", not res and r and all(c == "UnknownVerdict" for _, c in r), str(sorted(r)) + f" resolues={len(res)}")
 
+# ================================================================== 8 (v1.3.0, partie 3 et 2)
+print("== 8. StaleConfigDrift (D4), horizon ConvergenceDrift (progressDeadlineSeconds), SCP, Watch temoin")
+
+def with_stale_config(sec_started=0, sec_modified=300, sec_now=1000):
+    """nrf : Pod demarre a sec_started, ConfigMap nrf-config modifiee a sec_modified.
+    lastSyncTime fixe a sec_now (frais par rapport a sec_now) pour que le verdict
+    ne soit pas 'inconnu' faute de preuve de fraicheur."""
+    g = base()
+    cm = R("sylvatwin-5gc/ConfigMap/nrf-config")
+    g.add((cm, RDF.type, C.ConfigMap))
+    g.add((cm, C.lastModifiedAt, Literal(now_at(sec_modified), datatype=XSD.dateTime)))
+    g.add((DEP_NRF, C.mountsConfigMap, cm))
+    pod = R("sylvatwin-5gc/Pod/nrf-57b6849ccd-wflfd")
+    g.add((pod, C.startedAt, Literal(now_at(sec_started), datatype=XSD.dateTime)))
+    g.set((WLC, C.lastSyncTime, Literal(now_at(sec_now), datatype=XSD.dateTime)))
+    g.set((URIRef("https://w3id.org/sylvatwin/res/management-cluster"), C.lastSyncTime, Literal(now_at(sec_now), datatype=XSD.dateTime)))
+    return g
+
+g = with_stale_config(0, 300)
+d = judge(g)
+check("StaleConfigDrift : pod demarre AVANT la modif de la ConfigMap -> derive", len(list(d.subjects(RDF.type, C.StaleConfigDrift))) == 1)
+check("StaleConfigDrift : impact sur la NF nrf (direct)", (NF("nrf"), "direct") in {(o, str(d.value(s, C.impactPath))) for s, o in d.subject_objects(C.affectsFunction)})
+g2 = with_stale_config(300, 0)  # pod demarre APRES la modif : pas de derive
+check("StaleConfigDrift : pod demarre APRES la modif -> pas de derive", len(list(judge(g2).subjects(RDF.type, C.StaleConfigDrift))) == 0)
+# verdict : horizon infini (Flux ne redemarre jamais un pod) -> confirmee tout de suite
+ds = Dataset(); r = cycle(ds, with_stale_config(0, 300, 10), now_at(10))
+check("verdict StaleConfigDrift : confirmee immediatement (pas d'horizon)", ("StaleConfigDrift", "ConfirmedViolation") in r, str(sorted(r)))
+
+# Horizon ConvergenceDrift = progressDeadlineSeconds du Deployment (PAS interval+timeout Flux)
+def with_progress_deadline(pd_value=None, sec_now=10):
+    g = variant("S0B-udm")
+    if pd_value is not None:
+        g.set((DEP_UDM, C.progressDeadlineSeconds, Literal(float(pd_value), datatype=XSD.decimal)))
+    g.set((WLC, C.lastSyncTime, Literal(now_at(sec_now), datatype=XSD.dateTime)))
+    g.set((URIRef("https://w3id.org/sylvatwin/res/management-cluster"), C.lastSyncTime, Literal(now_at(sec_now), datatype=XSD.dateTime)))
+    return g
+ds = Dataset(); cycle(ds, with_progress_deadline(90, 10), now_at(10))
+h = list(ds.graph(HIST).objects(None, C.convergenceHorizon))
+check("horizon ConvergenceDrift = progressDeadlineSeconds explicite (90 s, pas l'horizon Flux 420 s)", any(float(x) == 90.0 for x in h), str(h))
+ds2 = Dataset(); cycle(ds2, with_progress_deadline(None, 10), now_at(10))  # absent -> defaut Kubernetes 600 s
+h2 = list(ds2.graph(HIST).objects(None, C.convergenceHorizon))
+check("horizon ConvergenceDrift = 600 s par defaut si progressDeadlineSeconds absent", any(float(x) == 600.0 for x in h2), str(h2))
+ds3 = Dataset(); r90 = cycle(ds3, with_progress_deadline(90, 10), now_at(10))
+check("verdict ConvergenceDrift suspectee a t=10 s (age < 90 s)", ("ConvergenceDrift", "SuspectedViolation") in r90, str(sorted(r90)))
+r90b = cycle(ds3, with_progress_deadline(90, 200), now_at(200))
+check("verdict ConvergenceDrift confirmee a t=200 s (age >= 90 s)", ("ConvergenceDrift", "ConfirmedViolation") in r90b, str(sorted(r90b)))
+
+# SCP : classe presente, disjointe des autres NF
+check("classe :SCP presente dans la TBox", (C.SCP, RDF.type, OWL.Class) in t)
+check(":SCP sous-classe de :NetworkFunction", (C.SCP, RDFS.subClassOf, C.NetworkFunction) in t)
+
+# Watch temoin et age de l'information (partie 2) : A_c(t) = t - u_c(t)
+def with_witness(age_witness, theta=30.0, sec=10):
+    g = variant("S2")
+    g.set((WLC, C.witnessLeaseName, Literal("my-workload-kubeadm-capd-control-plane-6w58l")))
+    g.set((WLC, C.lastWitnessRenewTime, Literal(now_at(sec - age_witness), datatype=XSD.dateTime)))
+    g.set((WLC, C.freshnessHorizon, Literal(theta, datatype=XSD.decimal)))
+    # le management aussi doit avoir une preuve de fraicheur (sinon il est, lui,
+    # considere perime par le repli lastSyncTime absent -> verdict inconnu a tort)
+    MG = URIRef("https://w3id.org/sylvatwin/res/management-cluster")
+    g.set((MG, C.lastSyncTime, Literal(now_at(sec), datatype=XSD.dateTime)))
+    return g
+ds = Dataset(); r = cycle(ds, with_witness(5, 30, 10), now_at(10))
+check("fraicheur : temoin recent (age 5s < theta 30s) -> verdict normal (pas inconnu)", ("BrokenReferenceDrift", "ConfirmedViolation") in r and not any(c == "UnknownVerdict" for _, c in r), str(sorted(r)))
+ds2 = Dataset(); r2 = cycle(ds2, with_witness(60, 30, 10), now_at(10))
+check("fraicheur : temoin perime (age 60s > theta 30s) -> verdict inconnu", r2 and all(c == "UnknownVerdict" for _, c in r2), str(sorted(r2)))
+
 print("\nRESULTAT GLOBAL :", "TOUT OK" if ok else "ECHECS")
 sys.exit(0 if ok else 1)

@@ -1,0 +1,22 @@
+# JUGE — D4 : StaleConfigDrift. Un Pod a demarre AVANT la derniere modification
+# de la ConfigMap qu'il monte (via le Deployment qui l'a cree). Flux ne le voit
+# jamais : la ConfigMap est a jour et conforme a Git dans l'API ; seul le
+# PROCESSUS en memoire du pod ne l'est pas (confirme par exec sur le vrai
+# cluster, campagne du 09/11/2026 : nrf et smf tournaient avec une config
+# differente de la ConfigMap apres une correction Flux qui n'a pas redemarre
+# le pod).
+# Garde P3 implicite : on ne compare QUE les ConfigMaps et les Pods reellement
+# observes (:lastModifiedAt et :startedAt sont tous deux ecrits par le greffier
+# UNIQUEMENT quand l'objet est vu : pas de faux positif en cas d'absence).
+PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+CONSTRUCT {
+  ?drift a :StaleConfigDrift ; :affects ?pod , ?cm ; :detectedAt ?now .
+} WHERE {
+  ?dep a :Deployment ; :mountsConfigMap ?cm .
+  ?cm :lastModifiedAt ?modified .
+  ?pod a :Pod ; :ownedBy+ ?dep ; :startedAt ?started .
+  FILTER (?started < ?modified)
+  BIND (NOW() AS ?now)
+  BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/StaleConfigDrift/", REPLACE(STR(?pod), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?drift)
+}

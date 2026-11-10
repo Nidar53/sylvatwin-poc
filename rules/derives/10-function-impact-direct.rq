@@ -13,7 +13,8 @@ CONSTRUCT {
 } WHERE {
   ?origine a ?typeOrigine ; :affects ?res .
   FILTER (?typeOrigine IN (:SpecDrift, :ConvergenceDrift, :PlacementDrift,
-                           :BrokenReferenceDrift, :GitOpsSyncDrift, :MachineNodeMismatchDrift))
+                           :BrokenReferenceDrift, :GitOpsSyncDrift, :MachineNodeMismatchDrift,
+                           :StaleConfigDrift))
   # NB : chaque branche contient son propre triplet :realizedBy. En SPARQL, un
   # FILTER seul dans un bloc d'UNION ne voit pas les variables du dehors.
   {

@@ -16,3 +16,9 @@ Ordre d'exécution, après `rules/derives` :
 4. `04-horizon-infini.ru` : retire cet horizon quand personne ne corrigera la dérive (hors Git, suspension, incohérence entre NF, référence cassée). Deux requêtes simples plutôt qu'une requête à `MINUS` imbriqués, pour que rdflib et Oxigraph donnent le même résultat.
 
 Paramètre : `?now` est remplacé par l'exécuteur par un littéral `xsd:dateTime`, le **même** pour toutes les requêtes d'un cycle.
+
+## Piège SPARQL supplémentaire (rdflib 7.6, 10/11/2026)
+
+Un sous-`SELECT` avec `GROUP BY` qui ne retourne **aucune ligne**, suivi d'un `OPTIONAL` dans le bloc englobant, produit à tort une solution (comme si le sous-`SELECT` était absent de la requête). Constaté sur `03-horizon.ru` et `04-horizon-convergence.ru` : une dérive hors du périmètre du sous-`SELECT` récupérait quand même l'ancienne valeur via l'`OPTIONAL` de nettoyage.
+
+Solution : ajouter `HAVING (COUNT(...) > 0)` au `GROUP BY`, pour que l'absence de résultat soit un vrai ensemble vide. Vérifié par un cas minimal isolé, et par le test de conformité rdflib/Oxigraph de l'opérateur.

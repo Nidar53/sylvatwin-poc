@@ -1,8 +1,14 @@
 # VERDICT DATE — un verdict par derive OUVERTE de l'historique, emis a ?now.
-#   UnknownVerdict      : information perimee (un cluster pas "ok", ou derniere
-#                         synchronisation plus vieille que __VALIDITY__ secondes)
-#   SuspectedViolation  : age de la derive < horizon de convergence (attendue)
-#   ConfirmedViolation  : age >= horizon, ou pas d'horizon (rien ne corrigera)
+#   UnknownVerdict      : au moins un cluster est perime. Un cluster est perime si
+#                         (a) observationStatus != "ok", ou
+#                         (b) un Watch temoin est configure (:witnessLeaseName) et
+#                             A_c(t) = t - u_c(t) (:lastWitnessRenewTime) > son
+#                             :freshnessHorizon (H_frais, partie 2), ou
+#                         (c) aucun temoin configure ET derniere :lastSyncTime
+#                             plus vieille que __VALIDITY__ (repli, compat clusters
+#                             sans Watch temoin installe).
+#   SuspectedViolation  : (sinon) age de la derive < horizon de convergence (attendue)
+#   ConfirmedViolation  : (sinon) age >= horizon, ou pas d'horizon (rien ne corrigera)
 # Entrees : <…/graph/history> (cycle de vie) et <…/graph/facts> (fraicheur).
 # __NOW__ et __VALIDITY__ sont remplaces par l'executeur.
 PREFIX :    <https://w3id.org/sylvatwin/core#>
@@ -18,19 +24,29 @@ CONSTRUCT {
     FILTER NOT EXISTS { ?d :resolvedAt ?r }
     OPTIONAL { ?d :convergenceHorizon ?h }
   }
-  # age de l'information = plus vieille derniere synchronisation reussie
   {
-    SELECT (MIN(?ls) AS ?oldestSync) (COUNT(?bad) AS ?nbBad) WHERE {
+    SELECT (MAX(?ageEff) AS ?infoAge) (SUM(?perimeNum) AS ?nbBad) WHERE {
+      # ?now est redefini ICI : un SELECT imbrique a son propre scope, un BIND
+      # du bloc exterieur n'y est PAS visible (constate le 10/11/2026 : sans ce
+      # re-BIND, ?ageEff tombait sur le repli 1.0E12, jamais > horizonEff, et
+      # un canal perime n'etait jamais detecte).
+      BIND ("__NOW__"^^xsd:dateTime AS ?now)
       GRAPH <https://w3id.org/sylvatwin/graph/facts> {
         ?kc a :KubernetesCluster .
+        OPTIONAL { ?kc :observationStatus ?st }
+        OPTIONAL { ?kc :lastWitnessRenewTime ?u }
+        OPTIONAL { ?kc :freshnessHorizon ?theta }
         OPTIONAL { ?kc :lastSyncTime ?ls }
-        OPTIONAL { ?kc :observationStatus ?st . FILTER (?st != "ok") BIND (?kc AS ?bad) }
       }
+      # age effectif : par temoin (A_c(t) = t - u_c(t)) si configure, sinon par
+      # derniere synchronisation (repli pour un cluster sans Watch temoin installe)
+      BIND (IF(BOUND(?u), __SECONDS__(?now, ?u), IF(BOUND(?ls), __SECONDS__(?now, ?ls), 1.0E12)) AS ?ageEff)
+      BIND (IF(BOUND(?theta), ?theta, __VALIDITY__) AS ?horizonEff)
+      BIND (IF((BOUND(?st) && ?st != "ok") || ?ageEff > ?horizonEff, 1, 0) AS ?perimeNum)
     }
   }
   BIND (__SECONDS__(?now, ?first) AS ?age)
-  BIND (__SECONDS__(?now, ?oldestSync) AS ?infoAge)
-  BIND (IF(?nbBad > 0 || !BOUND(?oldestSync) || ?infoAge > ?validity, :UnknownVerdict,
+  BIND (IF(?nbBad > 0, :UnknownVerdict,
         IF(BOUND(?h) && ?age < ?h, :SuspectedViolation, :ConfirmedViolation)) AS ?classe)
   BIND (IRI(CONCAT("https://w3id.org/sylvatwin/verdict/", REPLACE(STR(?d), "^https://w3id.org/sylvatwin/drift/", ""))) AS ?v)
 }
