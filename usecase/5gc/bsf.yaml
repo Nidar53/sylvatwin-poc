@@ -41,7 +41,6 @@ spec:
           readinessProbe:
             tcpSocket: {port: 7777}
             periodSeconds: 10
-            initialDelaySeconds: 30
           volumeMounts:
             - {name: config, mountPath: /etc/open5gs/custom}
       volumes:
