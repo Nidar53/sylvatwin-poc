@@ -13,8 +13,14 @@
 # 13/11/2026 : l'arithmetique passe par __SECONDS__, comme le verdict.)
 # Entrees : <…/graph/history> et <…/graph/facts>. __NOW__, __VALIDITY__ : executeur.
 PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-SELECT (MIN(?delai) AS ?echeance) WHERE {
+# Sortie : UNE ligne par echeance candidate (?genre = "horizon" | "fraicheur"),
+# ?delai en secondes, et pour la fraicheur ?cluster (nom) et ?fenetre (seuil, en
+# secondes). Quand un temoin renouvelle sa Lease, l'executeur repousse
+# l'echeance de ce cluster a (dernier evenement + ?fenetre + 1) sans rien juger :
+# la decision "inconnu" reste dans rules/verdict.
+SELECT ?genre ?cluster ?delai ?fenetre ?temoin WHERE {
   # ?now est lie DANS chaque branche : une branche d'UNION est evaluee seule, un
   # BIND du groupe englobant n'y est pas visible (meme piege que rules/verdict).
   {
@@ -23,6 +29,7 @@ SELECT (MIN(?delai) AS ?echeance) WHERE {
       ?d :firstDetectedAt ?first ; :convergenceHorizon ?h .
       FILTER NOT EXISTS { ?d :resolvedAt ?r }
     }
+    BIND ("horizon" AS ?genre)
     BIND (?h - __SECONDS__(?now, ?first) + 1 AS ?delai)
     FILTER (__SECONDS__(?now, ?first) < ?h)
   } UNION {
@@ -32,11 +39,14 @@ SELECT (MIN(?delai) AS ?echeance) WHERE {
       ?d2 :firstDetectedAt ?f2 . FILTER NOT EXISTS { ?d2 :resolvedAt ?r2 } } }
     GRAPH <https://w3id.org/sylvatwin/graph/facts> {
       ?kc a :KubernetesCluster .
-      { ?kc :lastWitnessRenewTime ?ref ; :freshnessHorizon ?lim }
+      ?kc rdfs:label ?cluster .
+      { ?kc :lastWitnessRenewTime ?ref ; :freshnessHorizon ?lim . BIND (true AS ?temoin) }
       UNION
       { ?kc :lastSyncTime ?ref . FILTER NOT EXISTS { ?kc :lastWitnessRenewTime ?x }
-        BIND (__VALIDITY__ AS ?lim) }
+        BIND (__VALIDITY__ AS ?lim) BIND (false AS ?temoin) }
     }
+    BIND ("fraicheur" AS ?genre)
+    BIND (?lim AS ?fenetre)
     BIND (?lim - __SECONDS__(?now, ?ref) + 1 AS ?delai)
     FILTER (__SECONDS__(?now, ?ref) <= ?lim)
   }
