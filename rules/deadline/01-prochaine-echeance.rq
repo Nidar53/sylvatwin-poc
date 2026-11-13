@@ -1,36 +1,43 @@
-# PROCHAINE ECHEANCE (A3) — le plus proche des instants futurs ou le jugement
-# d'une derive OUVERTE peut changer sans qu'aucun fait nouveau n'arrive :
+# PROCHAINE ECHEANCE (A3) — dans combien de secondes (a partir de ?now) le
+# jugement d'une derive OUVERTE peut-il changer sans qu'aucun fait nouveau
+# n'arrive ? Le plus proche de :
 #   (a) fin de l'horizon de convergence d'une derive ouverte
-#       (suspectee -> confirmee) : firstDetectedAt + horizon ;
-#   (b) peremption d'un temoin : :lastWitnessRenewTime + :freshnessHorizon
-#       (-> inconnu) ; sans temoin, :lastSyncTime + __VALIDITY__.
+#       (suspectee -> confirmee) : horizon - age ;
+#   (b) peremption d'un temoin (-> inconnu) : :freshnessHorizon - age du temoin ;
+#       sans temoin, __VALIDITY__ - age de la derniere synchronisation.
 # Une seconde de marge : les verdicts testent age < horizon et age > seuil
-# (comparaisons strictes, age en secondes entieres).
-# Aucun resultat = aucune echeance utile (rien d'ouvert, ou deja tout perime).
-# Le calcul de la date est ICI, pas dans le code Go.
+# (comparaisons strictes, age en secondes entieres). Aucun resultat = aucune
+# echeance utile (rien d'ouvert, ou tout deja perime).
+# Le delai est calcule ICI, par SPARQL ; l'executeur n'ajoute que ?now.
+# (Oxigraph 0.5.13 n'evalue pas dateTime + dayTimeDuration, constate le
+# 13/11/2026 : l'arithmetique passe par __SECONDS__, comme le verdict.)
 # Entrees : <…/graph/history> et <…/graph/facts>. __NOW__, __VALIDITY__ : executeur.
 PREFIX :    <https://w3id.org/sylvatwin/core#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-SELECT (MIN(?at) AS ?echeance) WHERE {
-  BIND ("__NOW__"^^xsd:dateTime AS ?now)
+SELECT (MIN(?delai) AS ?echeance) WHERE {
+  # ?now est lie DANS chaque branche : une branche d'UNION est evaluee seule, un
+  # BIND du groupe englobant n'y est pas visible (meme piege que rules/verdict).
   {
+    BIND ("__NOW__"^^xsd:dateTime AS ?now)
     GRAPH <https://w3id.org/sylvatwin/graph/history> {
       ?d :firstDetectedAt ?first ; :convergenceHorizon ?h .
       FILTER NOT EXISTS { ?d :resolvedAt ?r }
     }
-    BIND (?first + xsd:dayTimeDuration(CONCAT("PT", STR(xsd:integer(CEIL(?h)) + 1), "S")) AS ?at)
+    BIND (?h - __SECONDS__(?now, ?first) + 1 AS ?delai)
+    FILTER (__SECONDS__(?now, ?first) < ?h)
   } UNION {
+    BIND ("__NOW__"^^xsd:dateTime AS ?now)
     # la fraicheur n'a d'effet que s'il existe une derive ouverte a juger
     FILTER EXISTS { GRAPH <https://w3id.org/sylvatwin/graph/history> {
       ?d2 :firstDetectedAt ?f2 . FILTER NOT EXISTS { ?d2 :resolvedAt ?r2 } } }
     GRAPH <https://w3id.org/sylvatwin/graph/facts> {
       ?kc a :KubernetesCluster .
-      { ?kc :lastWitnessRenewTime ?u ; :freshnessHorizon ?th . BIND (?u AS ?ref) BIND (?th AS ?lim) }
+      { ?kc :lastWitnessRenewTime ?ref ; :freshnessHorizon ?lim }
       UNION
-      { ?kc :lastSyncTime ?u2 . FILTER NOT EXISTS { ?kc :lastWitnessRenewTime ?x }
-        BIND (?u2 AS ?ref) BIND (__VALIDITY__ AS ?lim) }
+      { ?kc :lastSyncTime ?ref . FILTER NOT EXISTS { ?kc :lastWitnessRenewTime ?x }
+        BIND (__VALIDITY__ AS ?lim) }
     }
-    BIND (?ref + xsd:dayTimeDuration(CONCAT("PT", STR(xsd:integer(CEIL(?lim)) + 1), "S")) AS ?at)
+    BIND (?lim - __SECONDS__(?now, ?ref) + 1 AS ?delai)
+    FILTER (__SECONDS__(?now, ?ref) <= ?lim)
   }
-  FILTER (?at > ?now)
 }
