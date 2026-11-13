@@ -15,6 +15,6 @@ CONSTRUCT {
   ?sc :scopeKind "Secret" ; :scopeNamespace ?scNs .
   ?ns :resourceName ?nsName .
   FILTER (?scNs = "*" || ?scNs = ?nsName)
-  BIND (NOW() AS ?now)
+  BIND ("__NOW__"^^xsd:dateTime AS ?now)
   BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/BrokenReferenceDrift/", REPLACE(STR(?secret), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?drift)
 }

@@ -7,6 +7,6 @@ CONSTRUCT {
   ?deployment a :Deployment ; :desiredReplicas ?git ;
               :observedSpecReplicas ?spec ; :actualReplicas ?status .
   FILTER (?git = ?spec && ?spec != ?status)
-  BIND (NOW() AS ?now)
+  BIND ("__NOW__"^^xsd:dateTime AS ?now)
   BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/ConvergenceDrift/", REPLACE(STR(?deployment), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?drift)
 }

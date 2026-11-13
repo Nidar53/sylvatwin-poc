@@ -17,6 +17,6 @@ CONSTRUCT {
   ?cm :lastModifiedAt ?modified .
   ?pod a :Pod ; :ownedBy+ ?dep ; :startedAt ?started .
   FILTER (?started < ?modified)
-  BIND (NOW() AS ?now)
+  BIND ("__NOW__"^^xsd:dateTime AS ?now)
   BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/StaleConfigDrift/", REPLACE(STR(?pod), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?drift)
 }

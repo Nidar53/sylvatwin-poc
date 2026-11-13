@@ -9,7 +9,7 @@ CONSTRUCT {
   FILTER NOT EXISTS {
     ?amf a :AMF ; :realizedBy/:inNamespace ?ns ; :servesSlice ?s2 . ?s2 :sst ?sst .
   }
-  BIND (NOW() AS ?now)
+  BIND ("__NOW__"^^xsd:dateTime AS ?now)
   BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/InterNFConsistencyDrift/slice/",
         REPLACE(STR(?smf), "^https://w3id.org/sylvatwin/(res|drift)/", ""), "/sst-", STR(?sst))) AS ?drift)
 }

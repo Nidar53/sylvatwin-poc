@@ -8,6 +8,6 @@ CONSTRUCT {
   ?deployment a :Deployment ; :requiresNodeLabel ?req .
   ?req :hasKey ?k ; :hasValue ?v .
   FILTER NOT EXISTS { ?node :hasLabel ?l . ?l :hasKey ?k ; :hasValue ?v . }
-  BIND (NOW() AS ?now)
+  BIND ("__NOW__"^^xsd:dateTime AS ?now)
   BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/PlacementDrift/", REPLACE(STR(?pod), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?drift)
 }

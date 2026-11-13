@@ -26,6 +26,6 @@ CONSTRUCT {
     # ... et que le Node vient d'une observation fraiche du cluster decrit.
     ?kc :observationStatus "ok" .
   }
-  BIND (NOW() AS ?now)
+  BIND ("__NOW__"^^xsd:dateTime AS ?now)
   BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/MachineNodeMismatchDrift/", REPLACE(STR(?obj), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?drift)
 }

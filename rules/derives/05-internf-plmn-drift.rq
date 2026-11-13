@@ -13,7 +13,7 @@ CONSTRUCT {
   FILTER (?mcc1 != ?mcc2 || ?mnc1 != ?mnc2)
   FILTER NOT EXISTS { ?nf1 :hasPlmn ?p2 }
   FILTER NOT EXISTS { ?nf2 :hasPlmn ?p1 }
-  BIND (NOW() AS ?now)
+  BIND ("__NOW__"^^xsd:dateTime AS ?now)
   BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/InterNFConsistencyDrift/plmn/",
         REPLACE(STR(?nf1), "^https://w3id.org/sylvatwin/(res|drift)/", ""), "/", REPLACE(STR(?nf2), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?drift)
 }

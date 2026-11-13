@@ -36,7 +36,7 @@ CONSTRUCT {
     ?res :machineHasNode ?node . ?pod a :Pod ; :runsOn ?node ; :ownedBy+ ?dep . ?nf :realizedBy ?dep .
     BIND ("infrastructure" AS ?chemin)
   }
-  BIND (NOW() AS ?now)
+  BIND ("__NOW__"^^xsd:dateTime AS ?now)
   BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/FunctionImpactDrift/",
         REPLACE(STR(?origine), "^https://w3id.org/sylvatwin/(res|drift)/", ""), "/", REPLACE(STR(?nf), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?impact)
 }

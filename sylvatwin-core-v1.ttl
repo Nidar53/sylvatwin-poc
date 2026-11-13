@@ -305,6 +305,18 @@ Secret), jamais l'absence du type."""@fr ;
     :usedInScenario "S2" ;
     :writtenBy "greffier" .
 
+:referencesSecretOptionally a owl:ObjectProperty ;
+    rdfs:label "reference le Secret de maniere optionnelle"@fr ;
+    rdfs:domain :Deployment ;
+    rdfs:range :Secret ;
+    rdfs:comment """Fait ecrit par le greffier (en plus de :referencesSecret) quand TOUTES les
+references du pod template a ce Secret portent optional: true (volume, projected,
+env secretKeyRef, envFrom secretRef). Kubernetes demarre alors le pod meme si le
+Secret manque. Le fait est seulement enregistre ; aucune regle ne le lit encore."""@fr ;
+    :k8sSource "Deployment.spec.template.spec.{volumes[].secret.optional, containers[].env[].valueFrom.secretKeyRef.optional, containers[].envFrom[].secretRef.optional}" ;
+    :usedInScenario "S2" ;
+    :writtenBy "greffier" .
+
 :affects a owl:ObjectProperty ;
     rdfs:label "concerne"@fr ;
     rdfs:domain :Drift ;

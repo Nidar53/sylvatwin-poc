@@ -12,7 +12,7 @@ CONSTRUCT {
   ?nf :dependsOnNF+ ?nfTouchee .
   FILTER NOT EXISTS { ?autre a :FunctionImpactDrift ; :causedBy ?origine ; :affectsFunction ?nf ;
                              :impactPath ?p . FILTER (?p != "dependance") }
-  BIND (NOW() AS ?now)
+  BIND ("__NOW__"^^xsd:dateTime AS ?now)
   BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/FunctionImpactDrift/",
         REPLACE(STR(?origine), "^https://w3id.org/sylvatwin/(res|drift)/", ""), "/", REPLACE(STR(?nf), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?impact)
 }

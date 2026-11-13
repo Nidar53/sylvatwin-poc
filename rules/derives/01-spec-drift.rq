@@ -8,6 +8,6 @@ CONSTRUCT {
 } WHERE {
   ?deployment a :Deployment ; :desiredReplicas ?git ; :observedSpecReplicas ?spec .
   FILTER (?git != ?spec)
-  BIND (NOW() AS ?now)
+  BIND ("__NOW__"^^xsd:dateTime AS ?now)
   BIND (IRI(CONCAT("https://w3id.org/sylvatwin/drift/SpecDrift/", REPLACE(STR(?deployment), "^https://w3id.org/sylvatwin/(res|drift)/", ""))) AS ?drift)
 }
