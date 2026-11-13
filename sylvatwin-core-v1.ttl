@@ -67,8 +67,8 @@
 # =============================================================================
 
 <https://w3id.org/sylvatwin/core> a owl:Ontology ;
-    owl:versionIRI <https://w3id.org/sylvatwin/core/1.3.0> ;
-    owl:versionInfo "1.3.0" ;
+    owl:versionIRI <https://w3id.org/sylvatwin/core/1.4.0> ;
+    owl:versionInfo "1.4.0" ;
     dcterms:title "SylvaTwin — ontologie minimale (version A) : Cluster API, Kubernetes, Flux, fonctions 5G"@fr ;
     dcterms:creator "Ahmed Nidhar Sebihi" ;
     dcterms:created "2026-11-08"^^xsd:date ;
@@ -112,6 +112,7 @@ possede : son cluster, son nom, son uid, son namespace et l'instant ou on l'a ob
 Un individu de cette classe qui a un :uid a ete VU dans le cluster ; sans :uid, on
 sait seulement que quelque chose le reference (utile pour S2)."""@fr ;
     :usedInScenario "S0" , "S1" , "S2" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :Namespace a owl:Class ; rdfs:subClassOf :KubernetesResource ;
@@ -120,6 +121,7 @@ sait seulement que quelque chose le reference (utile pour S2)."""@fr ;
 exemple deux Deployments "coredns" dans deux namespaces ou deux clusters).
 Il n'a pas lui-meme de namespace : IRI …/<cluster>/_/Namespace/<nom>."""@fr ;
     :usedInScenario "S0" , "S1" , "S2" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :Deployment a owl:Class ; rdfs:subClassOf :KubernetesResource ;
@@ -128,6 +130,7 @@ Il n'a pas lui-meme de namespace : IRI …/<cluster>/_/Namespace/<nom>."""@fr ;
 l'exigence de placement nodeSelector (S1) et les Secrets dont ses pods ont
 besoin (S2). C'est le seul individu qui porte les trois valeurs de replicas."""@fr ;
     :usedInScenario "S0" , "S1" , "S2" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :ReplicaSet a owl:Class ; rdfs:subClassOf :KubernetesResource ;
@@ -138,6 +141,7 @@ de deviner le Deployment par un label (le label "app" n'existe pas sur les pods
 Open5GS). Les anciens ReplicaSets a 0 replica restent visibles (historique des
 deploiements)."""@fr ;
     :usedInScenario "S1" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :Pod a owl:Class ; rdfs:subClassOf :KubernetesResource ;
@@ -146,6 +150,7 @@ deploiements)."""@fr ;
 Git ne decrit jamais un Pod. Pour S1, c'est le Pod (pas le Deployment) qui est
 mal place."""@fr ;
     :usedInScenario "S1" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :Node a owl:Class ; rdfs:subClassOf :KubernetesResource ;
@@ -154,6 +159,7 @@ mal place."""@fr ;
 Elle n'est pas decrite dans Git ; seuls ses labels observes comptent pour S1.
 Pas de namespace : IRI …/<cluster>/_/Node/<nom>."""@fr ;
     :usedInScenario "S1" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :Secret a owl:Class ; rdfs:subClassOf :KubernetesResource ;
@@ -162,6 +168,7 @@ Pas de namespace : IRI …/<cluster>/_/Node/<nom>."""@fr ;
 existence (uid, observedAt). Pour S2, la question est : un Deployment reference-t-il
 un Secret qui n'a pas (ou plus) d'existence observee ?"""@fr ;
     :usedInScenario "S2" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :Label a owl:Class ;
@@ -173,6 +180,7 @@ besoin de partager une convention d'ecriture. Un Label n'est pas une ressource
 Kubernetes : il appartient a un objet (IRI …/<objet>/label/<cle encodee> ou
 …/<objet>/nodeSelector/<cle encodee>)."""@fr ;
     :usedInScenario "S1" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 [] a owl:AllDisjointClasses ;
@@ -190,6 +198,7 @@ Kubernetes : il appartient a un objet (IRI …/<objet>/label/<cle encodee> ou
 par l'operateur : c'est le resultat d'une regle SHACL ou SPARQL."""@fr ;
     owl:disjointWith :KubernetesResource , :Label ;
     :usedInScenario "S0" , "S1" , "S2" ;
+    :layer "transverse" ;
     :writtenBy "juge" .
 
 :ConfigurationDrift a owl:Class ; rdfs:subClassOf :Drift ;
@@ -197,39 +206,81 @@ par l'operateur : c'est le resultat d'une regle SHACL ou SPARQL."""@fr ;
     rdfs:comment """S0 : le nombre de replicas n'est pas le meme partout. Deux sous-cas distincts,
 grace aux trois valeurs portees par le Deployment."""@fr ;
     :usedInScenario "S0" ;
+    :layer "transverse" ;
     :writtenBy "juge" .
 
-:SpecDrift a owl:Class ; rdfs:subClassOf :ConfigurationDrift ;
+:SpecDrift a owl:Class ; rdfs:subClassOf :ConfigurationDrift , :RepairedByFluxDrift ;
     rdfs:label "spec modifiee a la main"@fr , "Spec drift"@en ;
     rdfs:comment """S0, cas A : la spec du cluster ne correspond plus a Git
 (desiredReplicas != observedSpecReplicas). Exemple : quelqu'un a fait
 "kubectl scale". Flux la corrigera a son prochain intervalle."""@fr ;
     :usedInScenario "S0" ;
+    :layer "transverse" ;
     :writtenBy "juge" .
 
-:ConvergenceDrift a owl:Class ; rdfs:subClassOf :ConfigurationDrift ;
+:ConvergenceDrift a owl:Class ; rdfs:subClassOf :ConfigurationDrift , :RepairedByKubernetesDrift ;
     rdfs:label "Kubernetes n'a pas converge"@fr , "Convergence drift"@en ;
     rdfs:comment """S0, cas B : la spec est conforme a Git, mais le cluster n'atteint pas ce qu'elle
 demande (observedSpecReplicas != actualReplicas). Exemple : un pod ne peut pas etre
 cree ou planifie. Flux ne voit rien : la spec est conforme. Une regle doit tolerer
 les ecarts transitoires (deploiement en cours) : c'est le role du verdict date."""@fr ;
     :usedInScenario "S0" ;
+    :layer "transverse" ;
     :writtenBy "juge" .
 
-:PlacementDrift a owl:Class ; rdfs:subClassOf :Drift ;
+:PlacementDrift a owl:Class ; rdfs:subClassOf :Drift , :UnattendedDrift ;
     rdfs:label "derive de placement"@fr , "Placement drift"@en ;
     rdfs:comment """S1 : un Pod tourne sur un noeud qui ne porte plus un label exige par le
 nodeSelector de son Deployment. Kubernetes n'evince pas le pod ; Flux ne regarde
 pas les noeuds. Derive inter-couches (workload <-> infrastructure)."""@fr ;
     :usedInScenario "S1" ;
+    :layer "transverse" ;
     :writtenBy "juge" .
 
-:BrokenReferenceDrift a owl:Class ; rdfs:subClassOf :Drift ;
+:BrokenReferenceDrift a owl:Class ; rdfs:subClassOf :Drift , :UnattendedDrift ;
     rdfs:label "reference cassee"@fr , "Broken reference drift"@en ;
     rdfs:comment """S2 : un Deployment reference un Secret qui n'existe pas dans le cluster. Le pod
 qui tourne deja continue ; il ne pourra plus redemarrer. Si le Secret est hors
 Git (cas de udm-keys), ni Flux ni kubectl diff ne le voient."""@fr ;
     :usedInScenario "S2" ;
+    :layer "transverse" ;
+    :writtenBy "juge" .
+
+# --- Classes meres par "QUI REPARE" (A8, additif, v1.4.0). Les classes de derive
+# gardent leurs super-classes actuelles ; on en ajoute une. Les regles du juge
+# lisent cette hierarchie (rdfs:subClassOf*) au lieu de listes de classes.
+:RootDrift a owl:Class ; rdfs:subClassOf :Drift ;
+    rdfs:label "derive racine"@fr , "Root drift"@en ;
+    rdfs:comment """Toute derive qui n'est pas un impact : la cause. FunctionImpactDrift (derive
+d'impact, rattachee a une cause par :causedBy) est la seule derive qui n'en fait pas partie."""@fr ;
+    :layer "transverse" ;
+    :usedInScenario "S0" , "S1" , "S2" , "S4" , "S5" , "S6" , "D4" ;
+    :writtenBy "juge" .
+
+:RepairedByFluxDrift a owl:Class ; rdfs:subClassOf :RootDrift ;
+    rdfs:label "derive que Flux corrige"@fr , "Repaired-by-Flux drift"@en ;
+    rdfs:comment """Derive qu'une reconciliation Flux effacera d'elle-meme (a son prochain intervalle),
+tant que la Kustomization concernee n'est pas suspendue."""@fr ;
+    :layer "transverse" ;
+    :usedInScenario "S0" , "S5" ;
+    :writtenBy "juge" .
+
+:RepairedByKubernetesDrift a owl:Class ; rdfs:subClassOf :RootDrift ;
+    rdfs:label "derive que Kubernetes corrige"@fr , "Repaired-by-Kubernetes drift"@en ;
+    rdfs:comment """Derive que les controleurs Kubernetes finiront par resorber (convergence d'un
+deploiement) ; au-dela de l'horizon de convergence elle est confirmee."""@fr ;
+    :layer "transverse" ;
+    :usedInScenario "S0" ;
+    :writtenBy "juge" .
+
+:UnattendedDrift a owl:Class ; rdfs:subClassOf :RootDrift ;
+    rdfs:label "derive que personne ne corrige"@fr , "Unattended drift"@en ;
+    rdfs:comment """Derive que ni Flux ni Kubernetes ne corrigeront (Kubernetes n'evince pas un pod
+mal place, Flux ne regarde pas les noeuds ni ne redemarre un pod, un objet hors Git
+n'est reapplique par personne, etc.) : horizon de convergence infini. Rangement
+repris tel quel de rules/lifecycle/05 (cinq classes) ; il ne change aucun verdict."""@fr ;
+    :layer "transverse" ;
+    :usedInScenario "S1" , "S2" , "S4" , "S6" , "D4" ;
     :writtenBy "juge" .
 
 # =============================================================================
@@ -243,6 +294,7 @@ Git (cas de udm-keys), ni Flux ni kubectl diff ne le voient."""@fr ;
     rdfs:comment "Namespace de l'objet. Absent pour les objets sans namespace (Node, Namespace)."@fr ;
     :k8sSource "metadata.namespace" ;
     :usedInScenario "S0" , "S1" , "S2" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :ownedBy a owl:ObjectProperty ;
@@ -257,6 +309,7 @@ un Job, un StatefulSet… Une portee plus etroite ferait conclure a tort qu'un N
 est un ReplicaSet."""@fr ;
     :k8sSource "metadata.ownerReferences[].{kind,name}" ;
     :usedInScenario "S1" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :runsOn a owl:ObjectProperty , owl:FunctionalProperty ;
@@ -268,6 +321,7 @@ planifie (Pending) : un pod non place n'est pas mal place. Relation inter-couche
 au coeur de S1."""@fr ;
     :k8sSource "Pod.spec.nodeName" ;
     :usedInScenario "S1" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :hasLabel a owl:ObjectProperty ;
@@ -278,6 +332,7 @@ au coeur de S1."""@fr ;
 (S1). Le greffier ecrit tous les labels, sans filtrer : filtrer, ce serait deja juger."""@fr ;
     :k8sSource "metadata.labels" ;
     :usedInScenario "S1" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :requiresNodeLabel a owl:ObjectProperty ;
@@ -289,6 +344,7 @@ pod template devient un Label. S1 compare ces Labels (cle et valeur) a ceux du
 noeud sur lequel tourne chaque Pod."""@fr ;
     :k8sSource "Git : Deployment.spec.template.spec.nodeSelector" ;
     :usedInScenario "S1" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :referencesSecret a owl:ObjectProperty ;
@@ -303,6 +359,7 @@ donc tester l'absence de :uid (fait que seul le greffier ecrit quand il VOIT le
 Secret), jamais l'absence du type."""@fr ;
     :k8sSource "Deployment.spec.template.spec.{volumes[].secret.secretName, containers[].env[].valueFrom.secretKeyRef.name, containers[].envFrom[].secretRef.name, imagePullSecrets[].name}" ;
     :usedInScenario "S2" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :referencesSecretOptionally a owl:ObjectProperty ;
@@ -315,6 +372,7 @@ env secretKeyRef, envFrom secretRef). Kubernetes demarre alors le pod meme si le
 Secret manque. Le fait est seulement enregistre ; aucune regle ne le lit encore."""@fr ;
     :k8sSource "Deployment.spec.template.spec.{volumes[].secret.optional, containers[].env[].valueFrom.secretKeyRef.optional, containers[].envFrom[].secretRef.optional}" ;
     :usedInScenario "S2" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :affects a owl:ObjectProperty ;
@@ -323,6 +381,7 @@ Secret manque. Le fait est seulement enregistre ; aucune regle ne le lit encore.
     rdfs:range :KubernetesResource ;
     rdfs:comment "Ressource(s) concernee(s) par une derive. Ecrit uniquement par les regles."@fr ;
     :usedInScenario "S0" , "S1" , "S2" ;
+    :layer "transverse" ;
     :writtenBy "juge" .
 
 # =============================================================================
@@ -339,6 +398,7 @@ par cluster sans decouper les IRI. Le cluster lui-meme est l'individu :Kubernete
 (relie par :resourceInCluster), decrit par l'objet Cluster API :Cluster (:clusterDescribedBy)."""@fr ;
     :k8sSource "contexte du greffier (nom du Cluster CAPI)" ;
     :usedInScenario "S0" , "S1" , "S2" ;
+    :layer "transverse" ;
     :writtenBy "greffier" .
 
 :resourceName a owl:DatatypeProperty , owl:FunctionalProperty ;
@@ -348,6 +408,7 @@ par cluster sans decouper les IRI. Le cluster lui-meme est l'individu :Kubernete
     rdfs:comment "metadata.name, recopie pour les requetes et l'affichage."@fr ;
     :k8sSource "metadata.name" ;
     :usedInScenario "S0" , "S1" , "S2" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :uid a owl:DatatypeProperty , owl:FunctionalProperty ;
@@ -360,6 +421,7 @@ objet reference est le signal de S2. Un uid qui change a nom egal revele un obje
 supprime puis recree."""@fr ;
     :k8sSource "metadata.uid" ;
     :usedInScenario "S2" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :observedAt a owl:DatatypeProperty ;
@@ -368,6 +430,7 @@ supprime puis recree."""@fr ;
     rdfs:range xsd:dateTime ;
     rdfs:comment "Instant ou le greffier a observe l'objet. Sert au verdict date (age de l'information)."@fr ;
     :usedInScenario "S0" , "S1" , "S2" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :desiredRevision a owl:DatatypeProperty ;
@@ -381,6 +444,7 @@ Kustomization : revision de sa source (moitie "desire" de la paire Option C avec
 Tracabilite : la derive pointe vers un commit precis."""@fr ;
     :k8sSource "GitRepository.status.artifact.revision (Kustomization, Deployment) ; HelmChart.status.artifact.revision (HelmRelease)" ;
     :usedInScenario "S0" , "S1" , "S5" ;
+    :layer "L3" ;
     :writtenBy "greffier" .
 
 # --- replicas : trois valeurs sur le meme individu (Option C etendue) ---------
@@ -392,6 +456,7 @@ Tracabilite : la derive pointe vers un commit precis."""@fr ;
 :desiredRevision (1 si le champ est absent, comme le fait Kubernetes). S0."""@fr ;
     :k8sSource "Git : Deployment.spec.replicas" ;
     :usedInScenario "S0" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :observedSpecReplicas a owl:DatatypeProperty , owl:FunctionalProperty ;
@@ -402,6 +467,7 @@ Tracabilite : la derive pointe vers un commit precis."""@fr ;
 :desiredReplicas => la spec a ete modifiee hors Git (SpecDrift, S0 cas A)."""@fr ;
     :k8sSource "Deployment.spec.replicas" ;
     :usedInScenario "S0" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :actualReplicas a owl:DatatypeProperty , owl:FunctionalProperty ;
@@ -414,6 +480,7 @@ S0 cas B). Changement par rapport a v0, qui lisait status.replicas : ce compteur
 inclut les pods Pending et masquerait une non-convergence."""@fr ;
     :k8sSource "Deployment.status.readyReplicas" ;
     :usedInScenario "S0" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 # --- Pod ----------------------------------------------------------------------
@@ -425,6 +492,7 @@ inclut les pods Pending et masquerait une non-convergence."""@fr ;
 ConvergenceDrift (pods Pending) et a ignorer les pods termines en S1."""@fr ;
     :k8sSource "Pod.status.phase" ;
     :usedInScenario "S0" , "S1" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 # --- Label --------------------------------------------------------------------
@@ -434,6 +502,7 @@ ConvergenceDrift (pods Pending) et a ignorer les pods termines en S1."""@fr ;
     rdfs:range xsd:string ;
     rdfs:comment "Cle du label, par exemple \"kubernetes.io/os\" ou \"sylvatwin.orange.com/zone\". S1."@fr ;
     :usedInScenario "S1" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 :hasValue a owl:DatatypeProperty , owl:FunctionalProperty ;
@@ -442,6 +511,7 @@ ConvergenceDrift (pods Pending) et a ignorer les pods termines en S1."""@fr ;
     rdfs:range xsd:string ;
     rdfs:comment "Valeur du label (chaine vide autorisee, ex. node-role.kubernetes.io/control-plane). S1."@fr ;
     :usedInScenario "S1" ;
+    :layer "L2" ;
     :writtenBy "greffier" .
 
 # --- Drift --------------------------------------------------------------------
@@ -451,6 +521,7 @@ ConvergenceDrift (pods Pending) et a ignorer les pods termines en S1."""@fr ;
     rdfs:range xsd:dateTime ;
     rdfs:comment "Instant ou la regle a constate la derive. Ecrit uniquement par les regles."@fr ;
     :usedInScenario "S0" , "S1" , "S2" ;
+    :layer "transverse" ;
     :writtenBy "juge" .
 
 # #############################################################################
@@ -915,7 +986,7 @@ la derive d'origine : elle la rattache (:causedBy) et designe la NF (:affectsFun
     :usedInScenario "S3" ;
     :writtenBy "juge" .
 
-:InterNFConsistencyDrift a owl:Class ; rdfs:subClassOf :Drift ;
+:InterNFConsistencyDrift a owl:Class ; rdfs:subClassOf :Drift , :UnattendedDrift ;
     rdfs:label "incoherence entre fonctions reseau"@fr , "Inter-NF consistency drift"@en ;
     rdfs:comment """S4 : deux NF du meme coeur declarent des valeurs incompatibles (PLMN different,
 ou tranche servie par le SMF mais absente de l'AMF). Chaque objet est conforme a
@@ -924,7 +995,7 @@ son Git : ni Flux, ni Kyverno, ni kubectl diff ne le voient."""@fr ;
     :usedInScenario "S4" ;
     :writtenBy "juge" .
 
-:GitOpsSyncDrift a owl:Class ; rdfs:subClassOf :Drift ;
+:GitOpsSyncDrift a owl:Class ; rdfs:subClassOf :Drift , :RepairedByFluxDrift ;
     rdfs:label "livraison GitOps bloquee"@fr , "GitOps sync drift"@en ;
     rdfs:comment """S5 : la Kustomization n'applique pas la revision de sa source
 (desiredRevision != actualRevision), ou est suspendue. Le cluster cible n'est
@@ -933,7 +1004,7 @@ plus pilote par Git : toutes les ressources gerees heritent du risque."""@fr ;
     :usedInScenario "S5" ;
     :writtenBy "juge" .
 
-:MachineNodeMismatchDrift a owl:Class ; rdfs:subClassOf :Drift ;
+:MachineNodeMismatchDrift a owl:Class ; rdfs:subClassOf :Drift , :UnattendedDrift ;
     rdfs:label "Machine et Node incoherents (Cluster API)"@fr , "Machine/Node mismatch drift"@en ;
     rdfs:comment """S6 : une Machine CAPI hors creation n'a pas de Node, ou un Node du cluster reel
 n'est revendique par aucune Machine du Cluster qui le decrit. La description CAPI
@@ -1167,7 +1238,9 @@ ConvergenceDrift (PAS l'horizon Flux interval+timeout : correction du 10/11/2026
 le constat du 09/11 etait une approximation volontairement grossiere - voir
 rapport, campagne du 09/11)."""@fr ;
     :k8sSource "Deployment.spec.progressDeadlineSeconds" ;
-    :usedInScenario "S0" ; :writtenBy "greffier" .
+    :usedInScenario "S0" ; 
+    :layer "L2" ;
+    :writtenBy "greffier" .
 
 # --- ConfigMap et StaleConfigDrift (D4, partie 3) -----------------------------
 
@@ -1177,7 +1250,9 @@ rapport, campagne du 09/11)."""@fr ;
 CONTENU : seulement son existence et l'instant de sa derniere modification
 (:lastModifiedAt), pour detecter D4 (un Pod demarre avant la derniere mise a
 jour de la ConfigMap qu'il monte -> il tourne avec une config perimee)."""@fr ;
-    :usedInScenario "D4" ; :writtenBy "greffier" .
+    :usedInScenario "D4" ; 
+    :layer "L2" ;
+    :writtenBy "greffier" .
 
 [] a owl:AllDisjointClasses ;
     owl:members ( :ConfigMap :Namespace :Deployment :ReplicaSet :Pod :Node :Secret :CustomResource ) .
@@ -1190,7 +1265,9 @@ que :referencesSecret, mais pour les ConfigMaps). Base de D4 : comparer
 :lastModifiedAt de la ConfigMap a :startedAt du Pod qui en depend (via le meme
 Deployment)."""@fr ;
     :k8sSource "Deployment.spec.template.spec.volumes[].configMap.name" ;
-    :usedInScenario "D4" ; :writtenBy "greffier" .
+    :usedInScenario "D4" ; 
+    :layer "L2" ;
+    :writtenBy "greffier" .
 
 :lastModifiedAt a owl:DatatypeProperty , owl:FunctionalProperty ;
     rdfs:label "derniere modification"@fr ;
@@ -1200,16 +1277,20 @@ Deployment)."""@fr ;
 le greffier ne sait pas SI le Pod a rechargé cette version, seulement QUAND elle
 a change. C'est la regle (juge) qui compare a :startedAt du Pod."""@fr ;
     :k8sSource "ConfigMap.metadata.managedFields[].time (max)" ;
-    :usedInScenario "D4" ; :writtenBy "greffier" .
+    :usedInScenario "D4" ; 
+    :layer "L2" ;
+    :writtenBy "greffier" .
 
 :startedAt a owl:DatatypeProperty , owl:FunctionalProperty ;
     rdfs:label "demarre a"@fr ;
     rdfs:domain :Pod ; rdfs:range xsd:dateTime ;
     rdfs:comment "Pod.status.startTime : instant ou le pod a demarre (et donc lu sa configuration montee UNE FOIS, au demarrage)."@fr ;
     :k8sSource "Pod.status.startTime" ;
-    :usedInScenario "D4" ; :writtenBy "greffier" .
+    :usedInScenario "D4" ; 
+    :layer "L2" ;
+    :writtenBy "greffier" .
 
-:StaleConfigDrift a owl:Class ; rdfs:subClassOf :Drift ;
+:StaleConfigDrift a owl:Class ; rdfs:subClassOf :Drift , :UnattendedDrift ;
     rdfs:label "configuration perimee (D4)"@fr , "Stale config drift"@en ;
     rdfs:comment """D4 : un Pod a demarre AVANT la derniere modification de la ConfigMap qu'il
 monte (via son Deployment). Le pod tourne donc, EN MEMOIRE, avec une version

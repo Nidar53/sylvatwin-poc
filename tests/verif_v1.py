@@ -224,7 +224,7 @@ check("P3 S2 : aucune derive si les Secrets sont hors portee", len(judge(g)) == 
 print("== 7. Cycle de vie (SPARQL Update) et verdict date, sur rdflib (Dataset)")
 from rdflib import Dataset
 import datetime as dt
-HIST = URIRef("https://w3id.org/sylvatwin/graph/history"); FACTS = URIRef("https://w3id.org/sylvatwin/graph/facts"); DRIFTS = URIRef("https://w3id.org/sylvatwin/graph/drifts")
+HIST = URIRef("https://w3id.org/sylvatwin/graph/history"); FACTS = URIRef("https://w3id.org/sylvatwin/graph/facts"); DRIFTS = URIRef("https://w3id.org/sylvatwin/graph/drifts"); TBOX = URIRef("https://w3id.org/sylvatwin/graph/tbox")
 SECONDS = open(REPO + "rules/verdict/seconds.sparql").read().strip()
 def seconds_expr(a, b): return SECONDS.replace("$A", a).replace("$B", b)
 def prep(q, now, validity=600):
@@ -237,6 +237,8 @@ def cycle(ds, facts, now, validity=600):
     Renvoie {(classe de derive, classe de verdict)}."""
     for g in (FACTS, DRIFTS):
         ds.remove_graph(ds.graph(g))
+    tg = ds.graph(TBOX)  # la TBox est chargee une fois (comme le controleur au demarrage) : lifecycle/05 la lit
+    if len(tg) == 0: tg.parse(REPO + "sylvatwin-core-v1.ttl")
     fg = ds.graph(FACTS)
     for t in facts: fg.add(t)
     dg = ds.graph(DRIFTS)

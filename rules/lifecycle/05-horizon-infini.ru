@@ -14,6 +14,7 @@
 #   10/11/2026, avant les scenarios : un push Git normal etait "confirme".)
 #   (c) FunctionImpactDrift : memes cas, appliques a sa derive d'origine.
 PREFIX :    <https://w3id.org/sylvatwin/core#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 DELETE { GRAPH <https://w3id.org/sylvatwin/graph/history> { ?d :convergenceHorizon ?h . } }
 WHERE {
@@ -31,12 +32,12 @@ WHERE {
     FILTER (!BOUND(?m) && !BOUND(?cl))
   } UNION {
     GRAPH <https://w3id.org/sylvatwin/graph/drifts> {
-      ?d a ?ty . FILTER (?ty IN (:PlacementDrift, :InterNFConsistencyDrift,
-                                 :BrokenReferenceDrift, :MachineNodeMismatchDrift, :StaleConfigDrift)) }
+      ?d a ?ty . }
+    GRAPH <https://w3id.org/sylvatwin/graph/tbox> { ?ty rdfs:subClassOf* :UnattendedDrift }
   } UNION {
     # FunctionImpactDrift dont la cause est d'un de ces types : horizon infini aussi
     GRAPH <https://w3id.org/sylvatwin/graph/drifts> {
-      ?d :causedBy ?o2 . ?o2 a ?ty2 . FILTER (?ty2 IN (:PlacementDrift, :InterNFConsistencyDrift,
-                                 :BrokenReferenceDrift, :MachineNodeMismatchDrift, :StaleConfigDrift)) }
+      ?d :causedBy ?o2 . ?o2 a ?ty2 . }
+    GRAPH <https://w3id.org/sylvatwin/graph/tbox> { ?ty2 rdfs:subClassOf* :UnattendedDrift }
   }
 }
