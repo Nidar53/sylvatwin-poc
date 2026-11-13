@@ -25,7 +25,7 @@ Deux familles de fichiers :
 ## Points d'attention
 
 - **IRI des dérives.** Elles sont stables : `https://w3id.org/sylvatwin/drift/<Classe>/<IRI de la ressource encodée>`. La même dérive garde donc la même IRI d'un cycle à l'autre.
-- **`detectedAt`.** Il vaut `NOW()` à l'exécution. Le verdict daté (`sylvatwin-verdict-tbox.ttl`) n'est pas encore branché sur ces règles.
+- **`detectedAt`.** Il vaut `NOW()` à l'exécution. Le verdict daté (`legacy/sylvatwin-verdict-tbox.ttl`) n'est pas encore branché sur ces règles.
 - **Pas de temporisation.** Un ConvergenceDrift transitoire (déploiement en cours) est signalé.
 - **Pas de raisonneur requis.** Les règles n'utilisent que les types écrits par le greffier.
 

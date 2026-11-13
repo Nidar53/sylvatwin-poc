@@ -118,7 +118,7 @@ for ann, nom in [(RDFS.comment, "rdfs:comment"), (C.usedInScenario, ":usedInScen
 new = [x for x in cls | op | dp if (x, C.layer, None) in t]
 manque = [short(x) for x in cls | op | dp if (x, C.layer, None) not in t and (x, C.usedInScenario, None) in t and any(str(o) in ("S3","S4","S5","S6") for o in t.objects(x, C.usedInScenario)) and (x, C.writtenBy, Literal("greffier")) in t and str(x).split("#")[1] not in ("desiredRevision","managedBy")]
 check("termes v1.1.0 annotes :layer", not manque, ", ".join(manque))
-v0 = Graph().parse(REPO + "sylvatwin-slice-v0.ttl")
+v0 = Graph().parse(REPO + "legacy/sylvatwin-slice-v0.ttl")
 check("ancienne ontologie v0 chargeable avec v1 (espaces distincts)", len(t + v0) == len(t) + len(v0))
 k8s = [short(x) for x in t.subjects(C.k8sSource, None)]
 check("sources Kubernetes documentees (:k8sSource)", len(k8s) > 30, f"{len(k8s)} termes")
