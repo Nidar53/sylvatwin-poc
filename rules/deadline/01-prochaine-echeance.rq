@@ -16,6 +16,9 @@ PREFIX :    <https://w3id.org/sylvatwin/core#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 # Sortie : UNE ligne par echeance candidate (?genre = "horizon" | "fraicheur"),
+# plus, pour chaque cluster A TEMOIN deja perime alors qu'une derive est ouverte,
+# une ligne ?genre = "perime" (sans delai) : si une Lease revient pour ce cluster,
+# l'executeur rejuge tout de suite (le verdict repasse de inconnu a normal) ;
 # ?delai en secondes, et pour la fraicheur ?cluster (nom) et ?fenetre (seuil, en
 # secondes). Quand un temoin renouvelle sa Lease, l'executeur repousse
 # l'echeance de ce cluster a (dernier evenement + ?fenetre + 1) sans rien juger :
@@ -49,5 +52,17 @@ SELECT ?genre ?cluster ?delai ?fenetre ?temoin WHERE {
     BIND (?lim AS ?fenetre)
     BIND (?lim - __SECONDS__(?now, ?ref) + 1 AS ?delai)
     FILTER (__SECONDS__(?now, ?ref) <= ?lim)
+  } UNION {
+    BIND ("__NOW__"^^xsd:dateTime AS ?now)
+    FILTER EXISTS { GRAPH <https://w3id.org/sylvatwin/graph/history> {
+      ?d3 :firstDetectedAt ?f3 . FILTER NOT EXISTS { ?d3 :resolvedAt ?r3 } } }
+    GRAPH <https://w3id.org/sylvatwin/graph/facts> {
+      ?kc a :KubernetesCluster ; rdfs:label ?cluster ;
+          :lastWitnessRenewTime ?ref ; :freshnessHorizon ?lim .
+    }
+    BIND ("perime" AS ?genre)
+    BIND (?lim AS ?fenetre)
+    BIND (true AS ?temoin)
+    FILTER (__SECONDS__(?now, ?ref) > ?lim)
   }
 }
