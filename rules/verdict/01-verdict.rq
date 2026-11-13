@@ -1,15 +1,27 @@
 # VERDICT DATE — un verdict par derive OUVERTE de l'historique, emis a ?now.
-#   UnknownVerdict      : au moins un cluster est perime. Un cluster est perime si
+#   UnknownVerdict      : au moins un cluster DE SES RESSOURCES est perime ou non
+#                         observe (A5). Les clusters d'une derive sont ceux de ses
+#                         ressources touchees (:affects), et, pour une
+#                         FunctionImpactDrift, de celles de sa cause (:causedBy).
+#                         Cluster d'une ressource : :resourceInCluster ; pour une
+#                         NetworkFunction (sans cluster propre) : celui du
+#                         Deployment qui la realise (:realizedBy). PLMN et Slice
+#                         n'ont pas de cluster : une derive qui n'en touche aucun
+#                         n'est jamais "inconnue" par peremption.
+#                         Un cluster est perime si
 #                         (a) observationStatus != "ok", ou
 #                         (b) un Watch temoin est configure (:witnessLeaseName) et
 #                             A_c(t) = t - u_c(t) (:lastWitnessRenewTime) > son
 #                             :freshnessHorizon (H_frais, partie 2), ou
 #                         (c) aucun temoin configure ET derniere :lastSyncTime
 #                             plus vieille que __VALIDITY__ (repli, compat clusters
-#                             sans Watch temoin installe).
+#                             sans Watch temoin installe) ;
+#                         il est non observe si aucun fait :KubernetesCluster ne le
+#                         decrit.
 #   SuspectedViolation  : (sinon) age de la derive < horizon de convergence (attendue)
 #   ConfirmedViolation  : (sinon) age >= horizon, ou pas d'horizon (rien ne corrigera)
-# Entrees : <…/graph/history> (cycle de vie) et <…/graph/facts> (fraicheur).
+# Entrees : <…/graph/history> (cycle de vie), <…/graph/drifts> (ressources
+# touchees) et <…/graph/facts> (fraicheur, clusters).
 # __NOW__ et __VALIDITY__ sont remplaces par l'executeur.
 PREFIX :    <https://w3id.org/sylvatwin/core#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
@@ -24,29 +36,44 @@ CONSTRUCT {
     FILTER NOT EXISTS { ?d :resolvedAt ?r }
     OPTIONAL { ?d :convergenceHorizon ?h }
   }
-  {
-    SELECT (MAX(?ageEff) AS ?infoAge) (SUM(?perimeNum) AS ?nbBad) WHERE {
-      # ?now est redefini ICI : un SELECT imbrique a son propre scope, un BIND
-      # du bloc exterieur n'y est PAS visible (constate le 10/11/2026 : sans ce
-      # re-BIND, ?ageEff tombait sur le repli 1.0E12, jamais > horizonEff, et
-      # un canal perime n'etait jamais detecte).
+  OPTIONAL {
+    SELECT ?d (MAX(?ageEff) AS ?infoAge) (SUM(?perimeNum) AS ?nbBad) WHERE {
+      # ?now est redefini ICI : un SELECT imbrique a son propre scope (constate le
+      # 10/11/2026 : sans ce re-BIND, un canal perime n'etait jamais detecte).
       BIND ("__NOW__"^^xsd:dateTime AS ?now)
-      GRAPH <https://w3id.org/sylvatwin/graph/facts> {
-        ?kc a :KubernetesCluster .
-        OPTIONAL { ?kc :observationStatus ?st }
-        OPTIONAL { ?kc :lastWitnessRenewTime ?u }
-        OPTIONAL { ?kc :freshnessHorizon ?theta }
-        OPTIONAL { ?kc :lastSyncTime ?ls }
+      {
+        { GRAPH <https://w3id.org/sylvatwin/graph/drifts> { ?d :affects ?res } }
+        UNION
+        { GRAPH <https://w3id.org/sylvatwin/graph/drifts> { ?d :causedBy ?o . ?o :affects ?res } }
+        GRAPH <https://w3id.org/sylvatwin/graph/facts> {
+          ?res (:resourceInCluster | (:realizedBy / :resourceInCluster)) ?kc
+        }
+      } UNION {
+        # Derive ouverte mais NON re-derivee ce cycle (garde P3 : cluster devenu
+        # injoignable, la resolution est suspendue) : ses ressources ne sont plus
+        # dans <drifts>, on ne sait plus quel cluster la concerne -> on les
+        # considere tous (comportement d'avant A5, prudent).
+        GRAPH <https://w3id.org/sylvatwin/graph/history> {
+          ?d :firstDetectedAt ?f0 . FILTER NOT EXISTS { ?d :resolvedAt ?r0 } }
+        FILTER NOT EXISTS { GRAPH <https://w3id.org/sylvatwin/graph/drifts> { ?d a ?t0 } }
+        GRAPH <https://w3id.org/sylvatwin/graph/facts> { ?kc a :KubernetesCluster }
       }
+      # OPTIONAL a la racine (pas dans un GRAPH { OPTIONAL ... } isole : evalue
+      # seul, il ne verrait pas ?kc et produirait des lignes pour tous les clusters)
+      OPTIONAL { GRAPH <https://w3id.org/sylvatwin/graph/facts> { ?kc a :KubernetesCluster } BIND (true AS ?connu) }
+      OPTIONAL { GRAPH <https://w3id.org/sylvatwin/graph/facts> { ?kc :observationStatus ?st } }
+      OPTIONAL { GRAPH <https://w3id.org/sylvatwin/graph/facts> { ?kc :lastWitnessRenewTime ?u } }
+      OPTIONAL { GRAPH <https://w3id.org/sylvatwin/graph/facts> { ?kc :freshnessHorizon ?theta } }
+      OPTIONAL { GRAPH <https://w3id.org/sylvatwin/graph/facts> { ?kc :lastSyncTime ?ls } }
       # age effectif : par temoin (A_c(t) = t - u_c(t)) si configure, sinon par
       # derniere synchronisation (repli pour un cluster sans Watch temoin installe)
       BIND (IF(BOUND(?u), __SECONDS__(?now, ?u), IF(BOUND(?ls), __SECONDS__(?now, ?ls), 1.0E12)) AS ?ageEff)
       BIND (IF(BOUND(?theta), ?theta, __VALIDITY__) AS ?horizonEff)
-      BIND (IF((BOUND(?st) && ?st != "ok") || ?ageEff > ?horizonEff, 1, 0) AS ?perimeNum)
-    }
+      BIND (IF(!BOUND(?connu) || (BOUND(?st) && ?st != "ok") || ?ageEff > ?horizonEff, 1, 0) AS ?perimeNum)
+    } GROUP BY ?d
   }
   BIND (__SECONDS__(?now, ?first) AS ?age)
-  BIND (IF(?nbBad > 0, :UnknownVerdict,
+  BIND (IF(COALESCE(?nbBad, 0) > 0, :UnknownVerdict,
         IF(BOUND(?h) && ?age < ?h, :SuspectedViolation, :ConfirmedViolation)) AS ?classe)
   BIND (IRI(CONCAT("https://w3id.org/sylvatwin/verdict/", REPLACE(STR(?d), "^https://w3id.org/sylvatwin/drift/", ""))) AS ?v)
 }
