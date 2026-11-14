@@ -8,10 +8,12 @@ Graphes utilisés par le juge :
 - `…/graph/drifts` : les dérives du cycle courant (CONSTRUCT des `rules/derives`) ;
 - `…/graph/history` : un individu par IRI stable de dérive, avec `firstDetectedAt`, `lastDetectedAt`, `resolvedAt` et `convergenceHorizon`.
 
-Ordre d'exécution, après `rules/derives` :
+Ordre d'exécution, après `rules/derives` (les fichiers sont lus dans l'ordre alphabétique) :
 
+0. `00-reouverture-raz.ru` (14/11/2026) : une dérive **résolue** qui réapparaît est une nouvelle occurrence : tous ses anciens `firstDetectedAt` sont supprimés avant que 01 écrive le nouveau (sinon une date par occurrence, donc un verdict par date avec le même identifiant).
 1. `01-ouvrir-ou-prolonger.ru` : les dérives du cycle sont copiées dans `history`. On garde `firstDetectedAt` si l'IRI existe déjà, et on met à jour `lastDetectedAt`.
 2. `02-resoudre.ru` : une dérive présente dans `history` mais absente du cycle reçoit `resolvedAt`, à condition que le cluster soit observé avec succès (garde P3). Si l'information n'est pas fraîche, la dérive n'est pas déclarée résolue.
+2b. `02b-horizon-raz.ru` (14/11/2026) : pour toute dérive présente dans le cycle, l'ancien `convergenceHorizon` est supprimé **avant** 03 et 04 : l'horizon est recalculé à chaque cycle. Une Kustomization suspendue donne « pas d'horizon » (confirmée tout de suite), que la dérive soit nouvelle, rouverte ou déjà ouverte.
 3. `03-horizon.ru` : calcule `convergenceHorizon` = `interval` + `timeout` de la Kustomization (non suspendue) qui gère une ressource touchée.
 4. `04-horizon-infini.ru` : retire cet horizon quand personne ne corrigera la dérive (hors Git, suspension, incohérence entre NF, référence cassée). Deux requêtes simples plutôt qu'une requête à `MINUS` imbriqués, pour que rdflib et Oxigraph donnent le même résultat.
 

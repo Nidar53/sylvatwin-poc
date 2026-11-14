@@ -353,5 +353,44 @@ check("fraicheur : temoin recent (age 5s < theta 30s) -> verdict normal (pas inc
 ds2 = Dataset(); r2 = cycle(ds2, with_witness(60, 30, 10), now_at(10))
 check("fraicheur : temoin perime (age 60s > theta 30s) -> verdict inconnu", r2 and all(c == "UnknownVerdict" for _, c in r2), str(sorted(r2)))
 
+# ================================================================== 9 (correction du 14/11/2026)
+print("== 9. Reouverture d'une derive et horizon recalcule (docs/DIAGNOSTIC-SUSPENSION-2026-11-14.md)")
+GSD = URIRef("https://w3id.org/sylvatwin/drift/GitOpsSyncDrift/management-cluster/sylvatwin-flux/Kustomization.kustomize.toolkit.fluxcd.io/sylvatwin-5gc")
+def verdict_types(ds, now):
+    """{IRI de verdict : {classes}} pour le cycle courant (apres cycle())."""
+    vt = {}
+    for s_, p_, o_ in ds.query(prep(VQ, now)):
+        if p_ == RDF.type and str(o_).startswith(str(C)): vt.setdefault(str(s_), set()).add(str(o_).split("#")[1])
+    return vt
+def gsd_state(ds, now):
+    H = ds.graph(HIST)
+    firsts = sorted(str(x) for x in H.objects(GSD, C.firstDetectedAt)); hz = [float(x) for x in H.objects(GSD, C.convergenceHorizon)]
+    own = {k: v for k, v in verdict_types(ds, now).items() if "/verdict/GitOpsSyncDrift/" in k}
+    return firsts, hz, own
+def run_seq(steps):
+    ds = Dataset(); out = []
+    for v, sec in steps:
+        cycle(ds, facts_at(v, sec), now_at(sec)); out.append(gsd_state(ds, now_at(sec)))
+    return ds, out
+def one(own, cls): return len(own) == 1 and list(own.values())[0] == {cls}
+# cas 1 : ouverte avec horizon (Ks active), resolue, rouverte sous Ks SUSPENDUE -> confirmee tout de suite, une seule date
+ds, st = run_seq([("S5-retard", 10), (None, 100), ("S5-suspend", 200)])
+check("cas 1a : ouverte sous Ks active -> suspectee, horizon 420", one(st[0][2], "SuspectedViolation") and st[0][1] == [420.0], str(st[0]))
+check("cas 1b : rouverte sous Ks suspendue -> confirmee tout de suite, pas d'horizon, UNE date (= reouverture), UN verdict", one(st[2][2], "ConfirmedViolation") and st[2][1] == [] and st[2][0] == [now_at(200)], str(st[2]))
+# cas 2 : ouverte avec horizon, puis Ks suspendue SANS resolution -> plus d'horizon, confirmee, date conservee
+ds, st = run_seq([("S5-retard", 10), ("S5-suspend", 60)])
+check("cas 2 : Ks suspendue sans resolution -> plus d'horizon, confirmee, date d'origine conservee", one(st[1][2], "ConfirmedViolation") and st[1][1] == [] and st[1][0] == [now_at(10)], str(st[1]))
+# cas 3 : rouverte sous Ks active -> suspectee, age compte depuis la reouverture ; confirmee a 420 s
+ds, st = run_seq([("S5-retard", 10), (None, 100), ("S5-retard", 300), ("S5-retard", 500), ("S5-retard", 730)])
+check("cas 3a : rouverte sous Ks active -> suspectee, une date (= reouverture), horizon 420", one(st[2][2], "SuspectedViolation") and st[2][0] == [now_at(300)] and st[2][1] == [420.0], str(st[2]))
+check("cas 3b : t=500 (age 200 s < 420) toujours suspectee", one(st[3][2], "SuspectedViolation"), str(st[3]))
+check("cas 3c : t=730 (age 430 s >= 420) confirmee, un seul verdict", one(st[4][2], "ConfirmedViolation") and st[4][0] == [now_at(300)], str(st[4]))
+# invariant : jamais plus d'un firstDetectedAt ni d'un verdict par derive, sur une serie d'occurrences
+ds, st = run_seq([("S5-retard", 10), (None, 100), ("S5-suspend", 200), (None, 300), ("S5-retard", 400), (None, 500), ("S5-suspend", 600)])
+check("invariant : apres 4 occurrences, un seul firstDetectedAt et un seul verdict", all(len(x[0]) <= 1 and len(x[2]) <= 1 for x in st), str([(len(x[0]), len(x[2])) for x in st]))
+alld = {}
+for s_, o_ in ds.graph(HIST).subject_objects(C.firstDetectedAt): alld.setdefault(s_, []).append(o_)
+check("invariant : aucune derive de l'historique n'a plus d'un firstDetectedAt", all(len(v) == 1 for v in alld.values()), str({short(k): len(v) for k, v in alld.items() if len(v) > 1}))
+
 print("\nRESULTAT GLOBAL :", "TOUT OK" if ok else "ECHECS")
 sys.exit(0 if ok else 1)
