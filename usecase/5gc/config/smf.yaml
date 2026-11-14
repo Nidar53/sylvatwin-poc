@@ -29,9 +29,6 @@ smf:
         - sst: 1
           dnn:
             - internet
-        - sst: 2
-          dnn:
-            - internet
       tai:
         - plmn_id: {mcc: 999, mnc: 70}
           tac: 1
