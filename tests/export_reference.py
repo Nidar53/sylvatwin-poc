@@ -55,7 +55,7 @@ open(os.path.join(out, "verdict-sequence.tsv"), "w").write("\n".join(seq) + "\n"
 print("verdict-sequence :", seq)
 
 # --- Reference de la REOUVERTURE (correction du 14/11/2026, section 9 de verif_v1.py) ---
-# Ecrit reouv-<variante|saine>-t<sec>.facts.nt et reouverture-sequence.tsv :
+# Ecrit reouv-<variante|saine>-t<sec>.nt et reouverture-sequence.tsv :
 # "cas<TAB>t<TAB>nb_firstDetectedAt<TAB>horizons<TAB>verdicts" pour la derive GitOpsSyncDrift de la Kustomization.
 GSD_ = URIRef("https://w3id.org/sylvatwin/drift/GitOpsSyncDrift/management-cluster/sylvatwin-flux/Kustomization.kustomize.toolkit.fluxcd.io/sylvatwin-5gc")
 CASES = {"cas1": [("S5-retard", 10), (None, 100), ("S5-suspend", 200)],
@@ -67,7 +67,7 @@ for name, steps in CASES.items():
     ds = Dataset()
     for v, sec in steps:
         f = facts_at(v, sec)
-        f.serialize(os.path.join(out, f"reouv-{v or 'saine'}-t{sec}.facts.nt"), format="nt")
+        f.serialize(os.path.join(out, f"reouv-{v or 'saine'}-t{sec}.nt"), format="nt")
         cycle(ds, f, now_at(sec))
         H = ds.graph(HIST)
         nf = len(list(H.objects(GSD_, C.firstDetectedAt))); hz = ",".join(sorted(str(float(x)) for x in H.objects(GSD_, C.convergenceHorizon))) or "-"
