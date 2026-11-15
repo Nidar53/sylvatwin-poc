@@ -4,7 +4,7 @@ metadata:
   name: udr
   labels: {app.kubernetes.io/name: udr, app.kubernetes.io/part-of: sylvatwin-5gc, sylvatwin.orange.com/nf: udr}
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels: {app.kubernetes.io/name: udr}
   template:
